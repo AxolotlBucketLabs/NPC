@@ -487,10 +487,26 @@ final class NpcCommandHandler{
 	/** @param list<string> $args */
 	private function emote(CommandSender $sender, array $args) : bool{
 		$id = array_shift($args);
-		$emote = trim((string) (array_shift($args) ?? ""));
+		$emote = trim(implode(" ", $args));
 		if($id === null || $emote === ""){
 			$sender->sendMessage(TextFormat::YELLOW . "/npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]");
 			return true;
+		}
+		$interval = 100;
+		$trigger = "timer";
+		// A title may contain spaces. First try the complete remaining argument
+		// list as the emote name, then peel off optional trigger metadata only if
+		// the complete title does not resolve.
+		if(EmoteCatalog::resolve($emote) === null && strtolower($emote) !== "none"){
+			$last = $args[count($args) - 1] ?? null;
+			if(count($args) > 1 && is_string($last) && in_array(strtolower(str_replace("-", "_", $last)), ["timer", "spawn", "right_click", "left_click"], true)){
+				$trigger = strtolower(str_replace("-", "_", (string) array_pop($args)));
+			}
+			$last = $args[count($args) - 1] ?? null;
+			if(count($args) > 1 && is_string($last) && is_numeric($last)){
+				$interval = (int) array_pop($args);
+			}
+			$emote = trim(implode(" ", $args));
 		}
 		if(strtolower($emote) === "none"){
 			$ok = $this->manager->setAnimation($id, "none");
@@ -501,9 +517,7 @@ final class NpcCommandHandler{
 			$sender->sendMessage(TextFormat::RED . "Unknown emote. Use a supported alias or a valid Bedrock emote UUID.");
 			return true;
 		}
-		$interval = array_shift($args);
-		$trigger = strtolower(str_replace("-", "_", (string) (array_shift($args) ?? "timer")));
-		$ok = $this->manager->setAnimation($id, "emote", $emote, $interval !== null && is_numeric($interval) ? (int) $interval : 100, $trigger);
+		$ok = $this->manager->setAnimation($id, "emote", $emote, $interval, $trigger);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC player emote updated." : TextFormat::RED . "NPC not found or emote is invalid.");
 		return true;
 	}

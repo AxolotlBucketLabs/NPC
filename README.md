@@ -129,7 +129,7 @@ animation-trigger: right_click
 
 The old `animation-type: emote` and `animation-id: wave` form remains valid; `wave` is resolved to its Bedrock emote UUID before the packet is sent. For a Bee visual NPC, use `entity-type: bee` and `animation-type: fly`. The `animation-id` is ignored for `fly`; the interval is retained for compatibility but continuous flight is updated every server tick.
 
-The bundled name catalog is generated from [TwistedAsylumMC/Bedrock-Emotes](https://github.com/TwistedAsylumMC/Bedrock-Emotes)' `emotes.json` snapshot. Only title and UUID pairs are included; Marketplace images, offers and other metadata are not copied. Duplicate titles remain addressable by entering the UUID directly.
+The bundled name catalog is generated from [TwistedAsylumMC/Bedrock-Emotes](https://github.com/TwistedAsylumMC/Bedrock-Emotes)' `emotes.json` snapshot. Only title and UUID pairs are included; Marketplace images, offers and other metadata are not copied. Names work with spaces (`Air Guitar`) or underscores (`air_guitar`). Duplicate titles remain addressable by entering the UUID directly.
 
 Use `timer` for a repeating emote or actor animation, `spawn` for one event when the NPC is spawned, or `right_click`/`left_click` for interaction-triggered events. Client support for a particular emote is controlled by the Bedrock client; the packet is sent only for the selected Human NPC. Bee motion is updated continuously and does not use an emote packet.
 
