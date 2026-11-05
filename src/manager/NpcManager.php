@@ -22,15 +22,19 @@ use function atan2;
 use function count;
 use function deg2rad;
 use function file_get_contents;
+use function file_put_contents;
 use function filesize;
 use function is_array;
 use function is_dir;
 use function is_file;
+use function in_array;
 use function is_string;
+use function mkdir;
 use function microtime;
 use function realpath;
 use function rad2deg;
 use function sprintf;
+use function strlen;
 use function str_replace;
 use function str_starts_with;
 use function strtolower;
@@ -275,6 +279,41 @@ final class NpcManager{
 			return false;
 		}
 		$definition->setSkinFile($file);
+		$this->save();
+		$this->respawn($id);
+		return true;
+	}
+
+	public function setSkinFromPlayer(Player $player, string $id) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		$skin = $player->getSkin();
+		$skinData = $skin->getSkinData();
+		if(!in_array(strlen($skinData), Skin::ACCEPTED_SKIN_SIZES, true)){
+			$this->plugin->getLogger()->warning("Player skin for NPC '$id' has an unsupported size");
+			return false;
+		}
+		$skinsDirectory = $this->plugin->getDataFolder() . "skins";
+		if(!is_dir($skinsDirectory) && !mkdir($skinsDirectory, 0775, true) && !is_dir($skinsDirectory)){
+			return false;
+		}
+		$skinFile = $id . ".rgba";
+		if(file_put_contents($skinsDirectory . DIRECTORY_SEPARATOR . $skinFile, $skinData, LOCK_EX) === false){
+			return false;
+		}
+		$definition->setSkinFile($skinFile);
+		$capeData = $skin->getCapeData();
+		if(strlen($capeData) === 8192){
+			$capeFile = $id . ".cape.rgba";
+			if(file_put_contents($skinsDirectory . DIRECTORY_SEPARATOR . $capeFile, $capeData, LOCK_EX) !== false){
+				$definition->setCapeFile($capeFile);
+			}
+		}else{
+			$definition->setCapeFile("");
+		}
+		$definition->setGeometry($skin->getGeometryName(), $skin->getGeometryData());
 		$this->save();
 		$this->respawn($id);
 		return true;

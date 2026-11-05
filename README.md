@@ -39,7 +39,7 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc addcommand <id> <command|console:command>
 /npc clearcommands <id>
 /npc equipment <id> <hand|helmet|chestplate|leggings|boots> <item|clear>
-/npc skin <id> <relative-raw-skin-file|clear>
+/npc skin <id> <relative-raw-skin-file|player|clear>
 /npc cooldown <id> <seconds>
 /npc scale <id> <size>
 /npc rotate <id> <on|off>
@@ -80,7 +80,7 @@ npcs:
       helmet: iron_helmet
 ```
 
-Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, or 128x128 RGBA file under `plugin_data/NPC/skins/`, then run `/npc skin <id> <relative-file>`. Cape files must be exactly 8192 bytes and can be set in YAML with the `cape` field. The plugin does not download or follow skin URLs.
+Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, or 128x128 RGBA file under `plugin_data/NPC/skins/`, then run `/npc skin <id> <relative-file>`. From in-game, `/npc skin <id> player` (or the old `/slapper edit <id> skin`) copies the executing player's validated skin, cape, and geometry into that local directory. Cape files must be exactly 8192 bytes and can be set in YAML with the `cape` field. The plugin does not download or follow skin URLs.
 
 Player-specific integration placeholders are expanded for click actions. Nametags remain shared entity metadata, so `{online}` and `{players}` are suitable for persistent nametags while `{rank}` and `{balance}` are intended for action commands unless a future per-viewer nametag layer is enabled.
 

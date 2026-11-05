@@ -325,8 +325,15 @@ final class NpcCommandHandler{
 	private function skin(CommandSender $sender, array $args) : bool{
 		$id = array_shift($args);
 		$file = trim(implode(" ", $args));
-		if($id === null || $file === ""){
-			$sender->sendMessage(TextFormat::YELLOW . "Usage: /npc skin <id> <relative-raw-skin-file|clear>"); return true;
+		if($id === null){
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /npc skin <id> <relative-raw-skin-file|player|clear>"); return true;
+		}
+		if($file === "" || in_array(strtolower($file), ["player", "self"], true)){
+			if(!$sender instanceof Player){
+				$sender->sendMessage(TextFormat::YELLOW . "Usage: /npc skin <id> <relative-raw-skin-file|clear>"); return true;
+			}
+			$ok = $this->manager->setSkinFromPlayer($sender, $id);
+			$sender->sendMessage($ok ? TextFormat::GREEN . "NPC skin copied from your current player skin." : TextFormat::RED . "NPC not found or player skin could not be saved."); return true;
 		}
 		$ok = $this->manager->setSkinFile($id, strtolower($file) === "clear" ? "" : $file);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC skin setting updated. Put raw RGBA data under plugin_data/NPC/skins." : TextFormat::RED . "NPC not found or skin path is invalid."); return true;
