@@ -6,6 +6,7 @@ namespace NhanAZ\NPC\manager;
 
 use NhanAZ\NPC\entity\NpcEntity;
 use NhanAZ\NPC\entity\MobNpcEntity;
+use NhanAZ\NPC\model\EmoteCatalog;
 use NhanAZ\NPC\model\NpcDefinition;
 use pocketmine\console\ConsoleCommandSender;
 use pocketmine\entity\Entity;
@@ -681,8 +682,9 @@ final class NpcManager{
 		}
 		switch($definition->getAnimationType()){
 			case "emote":
-				if($entity instanceof NpcEntity && $definition->getAnimationId() !== ""){
-					$entity->emote($definition->getAnimationId());
+				$emoteId = EmoteCatalog::resolve($definition->getAnimationId());
+				if($entity instanceof NpcEntity && $emoteId !== null){
+					$entity->emote($emoteId);
 				}
 				break;
 			case "arm_swing":
@@ -727,7 +729,7 @@ final class NpcManager{
 			}
 		}
 		if($nearestId === null || $nearestEntity === null){
-			return in_array($tag, ["npc.nearest_id", "npc.nearest_name", "npc.nearest_distance", "npc.nearest_entity_id", "npc.nearest_type", "npc.nearest_animation"], true) ? "" : null;
+			return in_array($tag, ["npc.nearest_id", "npc.nearest_name", "npc.nearest_distance", "npc.nearest_entity_id", "npc.nearest_type", "npc.nearest_animation", "npc.nearest_emote", "npc.nearest_motion"], true) ? "" : null;
 		}
 		$definition = $this->definitions[$nearestId] ?? null;
 		return match($tag){
@@ -736,7 +738,9 @@ final class NpcManager{
 			"npc.nearest_distance" => sprintf("%.1f", sqrt($nearestDistance)),
 			"npc.nearest_entity_id" => (string) $nearestEntity->getId(),
 			"npc.nearest_type" => $definition?->getEntityType() ?? "",
-			"npc.nearest_animation" => $definition?->getAnimationType() ?? "none",
+			"npc.nearest_animation" => $definition !== null && in_array($definition->getAnimationType(), ["fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true) ? $definition->getAnimationType() : "none",
+			"npc.nearest_emote" => $definition?->getAnimationType() === "emote" ? $definition->getAnimationId() : "",
+			"npc.nearest_motion" => $definition?->getAnimationType() === "fly" ? "fly" : "none",
 			default => null
 		};
 	}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NhanAZ\NPC\command;
 
 use NhanAZ\NPC\manager\NpcManager;
+use NhanAZ\NPC\model\EmoteCatalog;
 use NhanAZ\NPC\ui\NpcUiManager;
 use pocketmine\command\CommandSender;
 use pocketmine\player\Player;
@@ -72,7 +73,8 @@ final class NpcCommandHandler{
 			case "sound-type": case "hitsound": return $this->effectType($sender, "sound", $args);
 			case "menuname": case "menu-name": return $this->menuName($sender, $args);
 			case "type": case "entity-type": return $this->entityType($sender, $args);
-			case "animation": case "emote": return $this->animation($sender, $args);
+			case "animation": return $this->animation($sender, $args);
+			case "emote": return $this->emote($sender, $args);
 			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
 			case "tp": return $this->teleport($sender, $args);
 			case "reload": $this->manager->reload(); $sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded."); return true;
@@ -124,7 +126,8 @@ final class NpcCommandHandler{
 			"/npc sound-type <id> <click|pop|door_bump|...>",
 			"/npc menuname <id> <name|remove>",
 			"/npc type <id> <human|bee>",
-			"/npc animation <id> <none|emote|fly|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]",
+			"/npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]",
+			"/npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]",
 			"/npc ui",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc debug | /npc reload"
@@ -456,15 +459,50 @@ final class NpcCommandHandler{
 	private function animation(CommandSender $sender, array $args) : bool{
 		$id = array_shift($args);
 		$type = strtolower(str_replace("-", "_", array_shift($args) ?? ""));
-		$animationId = (string) (array_shift($args) ?? "");
-		$interval = array_shift($args);
-		$trigger = strtolower(str_replace("-", "_", (string) (array_shift($args) ?? "timer")));
-		if($id === null || !in_array($type, ["none", "emote", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
-			$sender->sendMessage(TextFormat::YELLOW . "/npc animation <id> <none|emote|fly|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]");
+		if($id === null){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]");
 			return true;
 		}
-		$ok = $this->manager->setAnimation($id, $type, $animationId, $interval !== null && is_numeric($interval) ? (int) $interval : 100, $trigger);
+		// Accept the old combined syntax while making the concepts explicit.
+		if($type === "emote"){
+			return $this->emote($sender, [$id, ...$args]);
+		}
+		if(!in_array($type, ["none", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]");
+			return true;
+		}
+		// Pre-v0.4 accepted an unused animation ID before interval/trigger.
+		if(isset($args[0]) && !is_numeric($args[0])){
+			array_shift($args);
+		}
+		$interval = array_shift($args);
+		$trigger = strtolower(str_replace("-", "_", (string) (array_shift($args) ?? "timer")));
+		$ok = $this->manager->setAnimation($id, $type, "", $interval !== null && is_numeric($interval) ? (int) $interval : 100, $trigger);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC animation updated." : TextFormat::RED . "NPC not found or animation is invalid.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function emote(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$emote = trim((string) (array_shift($args) ?? ""));
+		if($id === null || $emote === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]");
+			return true;
+		}
+		if(strtolower($emote) === "none"){
+			$ok = $this->manager->setAnimation($id, "none");
+			$sender->sendMessage($ok ? TextFormat::GREEN . "NPC player emote disabled." : TextFormat::RED . "NPC not found.");
+			return true;
+		}
+		if(EmoteCatalog::resolve($emote) === null){
+			$sender->sendMessage(TextFormat::RED . "Unknown emote. Use a supported alias or a valid Bedrock emote UUID.");
+			return true;
+		}
+		$interval = array_shift($args);
+		$trigger = strtolower(str_replace("-", "_", (string) (array_shift($args) ?? "timer")));
+		$ok = $this->manager->setAnimation($id, "emote", $emote, $interval !== null && is_numeric($interval) ? (int) $interval : 100, $trigger);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC player emote updated." : TextFormat::RED . "NPC not found or emote is invalid.");
 		return true;
 	}
 

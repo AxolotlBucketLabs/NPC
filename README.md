@@ -27,8 +27,9 @@ The first deployable milestone includes:
 - Slapper Human `menuname` compatibility using the current Axolotl-PM player-list packet API;
 - edit aliases for names, commands, hand/armor equipment, scale, reload, and teleporting an NPC or player;
 - `/npc ui`, a PMForms-backed operator GUI for creating, editing, importing and deleting NPCs;
-- Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click animation triggers;
-- `fly` for a passive Bee hover/orbit, plus `arm_swing`, `hurt`, `critical_hit`, `magic_critical`, and player emote animation packets;
+- Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click event triggers;
+- player emotes such as `wave`, `simple_clap`, `over_there`, `over_here`, `bow`, `saluting`, and `thinking`, plus arbitrary valid Bedrock emote UUIDs;
+- actor animations (`fly` for the Bee wing/flight state, plus `arm_swing`, `hurt`, `critical_hit`, and `magic_critical`) kept separate from player emotes;
 - optional ScoreHud integration with live `npc.*` tags;
 - DevTools PHAR packaging with the PMForms virion prepared from its pinned Composer source, plus PHPStan Level Max in CI.
 
@@ -52,7 +53,8 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc sound-type <id> <type>
 /npc menuname <id> <name|remove>
 /npc type <id> <human|bee>
-/npc animation <id> <none|emote|fly|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]
+/npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]
+/npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]
 /npc ui
 /npc rotate <id> <on|off>
 /npc particle <id> <on|off>
@@ -104,11 +106,17 @@ Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, o
 
 The GUI is permission-gated by `npc.admin`. It is a control surface for trusted operators, not a player-facing NPC interaction menu.
 
-## Entity types and animations
+## Entity types, emotes and animations
 
-Human is the default and supports local skins, cape/geometry data, equipment, player-list menu names, and emotes. `bee` is a lightweight visual mob actor using the Bedrock `minecraft:bee` network identifier. It is not a full Bee AI implementation: it does not pathfind, pollinate, or persist as a world entity. Skins and equipment are disabled for Bee definitions. With `animation-type: fly`, the plugin moves the actor through a small passive hover/orbit and advertises the Bedrock flying metadata flag; this is visual movement, not native Bee AI.
+Human is the default and supports local skins, cape/geometry data, equipment, player-list menu names, and player emotes. `bee` is a lightweight visual mob actor using the Bedrock `minecraft:bee` network identifier. It is not a full Bee AI implementation: it does not pathfind, pollinate, or persist as a world entity. Skins and equipment are disabled for Bee definitions. With `animation-type: fly`, the plugin moves the actor through a small passive hover/orbit and advertises the Bedrock flying metadata flag; this is visual movement, not native Bee AI.
 
-Animation configuration is stored with the NPC definition:
+Player emotes, actor animations, and particles are separate controls:
+
+- `/npc emote` sends a Bedrock player-emote packet. Friendly aliases resolve to the corresponding Bedrock UUID, and any valid Bedrock emote UUID is accepted so the catalog is not artificially limited to the aliases shipped with this plugin.
+- `/npc animation` controls actor animation/state: `fly` enables the Bee wing/flight state and passive hover/orbit, while arm swing, hurt, critical hit, and magic critical send actor event animations. None of these are player emotes.
+- `/npc particle` and `/npc particle-type` control particles independently of both emote and actor animation controls.
+
+The legacy `animation-type` key is retained for configuration compatibility. New definitions can still use the same storage shape:
 
 ```yaml
 entity-type: human
@@ -118,9 +126,9 @@ animation-interval: 100
 animation-trigger: right_click
 ```
 
-For a Bee visual NPC, use `entity-type: bee` and `animation-type: fly`. The `animation-id` is ignored for `fly`; the interval is retained for compatibility but continuous flight is updated every server tick.
+The old `animation-type: emote` and `animation-id: wave` form remains valid; `wave` is resolved to its Bedrock emote UUID before the packet is sent. For a Bee visual NPC, use `entity-type: bee` and `animation-type: fly`. The `animation-id` is ignored for `fly`; the interval is retained for compatibility but continuous flight is updated every server tick.
 
-Use `timer` for a repeating animation, `spawn` for one animation when the NPC is spawned, or `right_click`/`left_click` for interaction-triggered animation. Client support for a particular emote is controlled by the Bedrock client; packet support is sent only for the selected actor.
+Use `timer` for a repeating emote or actor animation, `spawn` for one event when the NPC is spawned, or `right_click`/`left_click` for interaction-triggered events. Client support for a particular emote is controlled by the Bedrock client; the packet is sent only for the selected Human NPC. Bee motion is updated continuously and does not use an emote packet.
 
 Player-specific integration placeholders are expanded for click actions. Nametags remain shared entity metadata, so `{online}` and `{players}` are suitable for persistent nametags while `{rank}` and `{balance}` are intended for action commands unless a future per-viewer nametag layer is enabled.
 
@@ -174,9 +182,11 @@ ScoreHud is optional and is detected at runtime. When present, NPC refreshes the
 {npc.nearest_entity_id}
 {npc.nearest_type}
 {npc.nearest_animation}
+{npc.nearest_emote}
+{npc.nearest_motion}
 ```
 
-The tags are resolved in the viewer's current world. `npc.nearest_*` values refer to the closest currently spawned NPC, while `npc.count` and `npc.ids` include only NPCs visible in that world. The integration uses ScoreHud's event API and does not require ScoreHud to be installed for NPC to load.
+The tags are resolved in the viewer's current world. `npc.nearest_animation` contains the actor animation/state (`fly`, `arm_swing`, `hurt`, `critical_hit`, `magic_critical`) or `none`; `npc.nearest_emote` contains the configured friendly emote name/UUID or an empty string; and `npc.nearest_motion` remains a convenience value containing `fly` or `none`. `npc.nearest_*` values refer to the closest currently spawned NPC, while `npc.count` and `npc.ids` include only NPCs visible in that world. The integration uses ScoreHud's event API and does not require ScoreHud to be installed for NPC to load.
 
 The old Slapper repositories and Poggit Archive pages supplied for this project are treated as feature references only. No source code has been copied into this implementation; license and API behavior will be reviewed separately for each future adapter.
 

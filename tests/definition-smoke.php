@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/src/model/NpcDefinition.php';
 require dirname(__DIR__) . '/src/model/FlightPattern.php';
+require dirname(__DIR__) . '/src/model/EmoteCatalog.php';
 
 use NhanAZ\NPC\model\NpcDefinition;
 use NhanAZ\NPC\model\FlightPattern;
+use NhanAZ\NPC\model\EmoteCatalog;
 
 $definition = new NpcDefinition(
 	"welcome",
@@ -31,6 +33,9 @@ $definition->setAnimation("emote", "wave", 20, "right-click");
 
 if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 || $definition->getCooldown() !== 2.0 || $definition->getEntityType() !== "bee" || $definition->getAnimationType() !== "emote" || $definition->getAnimationId() !== "wave" || $definition->getAnimationInterval() !== 20 || $definition->getAnimationTrigger() !== "right_click"){
 	throw new RuntimeException("NpcDefinition basic state is invalid");
+}
+if(EmoteCatalog::resolve("wave") !== "4c8ae710-df2e-47cd-814d-cc7bf21a3d67" || EmoteCatalog::resolve("4c8ae710-df2e-47cd-814d-cc7bf21a3d67") !== "4c8ae710-df2e-47cd-814d-cc7bf21a3d67" || EmoteCatalog::resolve("not-an-emote") !== null){
+	throw new RuntimeException("Bedrock emote resolution failed");
 }
 
 $roundTrip = NpcDefinition::fromArray("welcome", $definition->toArray());

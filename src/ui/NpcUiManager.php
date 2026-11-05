@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NhanAZ\NPC\ui;
 
 use NhanAZ\NPC\manager\NpcManager;
+use NhanAZ\NPC\model\EmoteCatalog;
 use dktapps\pmforms\CustomForm;
 use dktapps\pmforms\CustomFormResponse;
 use dktapps\pmforms\MenuForm;
@@ -131,8 +132,9 @@ final class NpcUiManager{
 			return;
 		}
 		$typeOptions = ["Human", "Bee"];
-		$animationOptions = ["None", "Emote", "Fly (Bee)", "Arm swing", "Hurt", "Critical hit", "Magic critical"];
-		$animationTypes = ["none", "emote", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"];
+		$actorAnimationOptions = ["None", "Fly (Bee: wing/flight)", "Arm swing", "Hurt", "Critical hit", "Magic critical"];
+		$actorAnimationTypes = ["none", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"];
+		$currentAnimationType = $definition->getAnimationType();
 		$triggers = ["Timer", "Spawn", "Right click", "Left click"];
 		$triggerValues = ["timer", "spawn", "right_click", "left_click"];
 		$player->sendForm(new CustomForm(
@@ -149,12 +151,17 @@ final class NpcUiManager{
 				new Toggle("sound", "Play hit sound", $definition->isSoundEnabled()),
 				new Input("particle_type", "Particle type", "flame", $definition->getParticleType()),
 				new Input("sound_type", "Sound type", "click", $definition->getSoundType()),
-				new Dropdown("animation", "Animation", $animationOptions, max(0, array_search($definition->getAnimationType(), $animationTypes, true))),
-				new Input("animation_id", "Emote ID (only for emote)", "wave", $definition->getAnimationId()),
+				new Dropdown("actor_animation", "Actor animation (Bee fly is not a player emote)", $actorAnimationOptions, max(0, array_search(in_array($currentAnimationType, $actorAnimationTypes, true) ? $currentAnimationType : "none", $actorAnimationTypes, true))),
+				new Input("emote_id", "Player emote name or UUID (blank disables)", "wave", $currentAnimationType === "emote" ? $definition->getAnimationId() : ""),
 				new Input("animation_interval", "Animation interval in ticks", "100", (string) $definition->getAnimationInterval()),
 				new Dropdown("animation_trigger", "Animation trigger", $triggers, max(0, array_search($definition->getAnimationTrigger(), $triggerValues, true)))
 			],
-			function(Player $player, CustomFormResponse $response) use ($id, $animationTypes, $triggerValues) : void{
+			function(Player $player, CustomFormResponse $response) use ($id, $actorAnimationTypes, $triggerValues) : void{
+				$emote = trim($response->getString("emote_id"));
+				if($emote !== "" && EmoteCatalog::resolve($emote) === null){
+					$player->sendMessage(TextFormat::RED . "Unknown emote. Use a supported alias or a valid Bedrock emote UUID.");
+					return;
+				}
 				$name = trim($response->getString("name"));
 				if($name !== ""){
 					$this->manager->setLines($id, 1, $name);
@@ -174,10 +181,11 @@ final class NpcUiManager{
 				$this->manager->setBoolean($id, "sound", $response->getBool("sound"));
 				$this->manager->setEffectType($id, "particle", $response->getString("particle_type"));
 				$this->manager->setEffectType($id, "sound", $response->getString("sound_type"));
+				$animationType = $emote !== "" ? "emote" : ($actorAnimationTypes[$response->getInt("actor_animation")] ?? "none");
 				$this->manager->setAnimation(
 					$id,
-					$animationTypes[$response->getInt("animation")] ?? "none",
-					$response->getString("animation_id"),
+					$animationType,
+					$emote,
 					is_numeric($response->getString("animation_interval")) ? (int) $response->getString("animation_interval") : 100,
 					$triggerValues[$response->getInt("animation_trigger")] ?? "timer"
 				);

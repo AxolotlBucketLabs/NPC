@@ -27,7 +27,9 @@ final class ScoreHudIntegration{
 		"npc.nearest_distance",
 		"npc.nearest_entity_id",
 		"npc.nearest_type",
-		"npc.nearest_animation"
+		"npc.nearest_animation",
+		"npc.nearest_emote",
+		"npc.nearest_motion"
 	];
 
 	private static bool $registered = false;
