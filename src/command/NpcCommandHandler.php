@@ -6,6 +6,7 @@ namespace NhanAZ\NPC\command;
 
 use NhanAZ\NPC\manager\NpcManager;
 use NhanAZ\NPC\model\EmoteCatalog;
+use NhanAZ\NPC\model\VanillaMobCatalog;
 use NhanAZ\NPC\ui\NpcUiManager;
 use pocketmine\command\CommandSender;
 use pocketmine\player\Player;
@@ -24,6 +25,10 @@ final class NpcCommandHandler{
 
 	public function __construct(private NpcManager $manager){
 		$this->ui = new NpcUiManager($manager);
+	}
+
+	public function openEditor(Player $player, string $id) : void{
+		$this->ui->openEditor($player, $id);
 	}
 
 	/** @param list<string> $args */
@@ -55,6 +60,7 @@ final class NpcCommandHandler{
 			case "edit": return $this->edit($sender, $args);
 			case "migrate-slapper": return $this->migrateSlapper($sender, $args);
 			case "entities": return $this->entities($sender);
+			case "updateall": return $this->updateAll($sender);
 			case "version": $sender->sendMessage(TextFormat::GREEN . "NPC " . $this->manager->getVersion()); return true;
 			case "cancel": case "stopid": case "stopremove":
 				$sender->sendMessage($sender instanceof Player && $this->manager->cancelSession($sender) ? TextFormat::GREEN . "Cancelled." : TextFormat::GREEN . "No pending NPC action needs cancelling.");
@@ -67,6 +73,7 @@ final class NpcCommandHandler{
 			case "clearcommands": return $this->clearCommands($sender, $args);
 			case "equipment": return $this->equipment($sender, $args);
 			case "skin": return $this->skin($sender, $args);
+			case "skin-url": return $this->skinUrl($sender, $args);
 			case "cooldown": return $this->cooldown($sender, $args);
 			case "scale": return $this->scale($sender, $args);
 			case "particle-type": return $this->effectType($sender, "particle", $args);
@@ -76,7 +83,15 @@ final class NpcCommandHandler{
 			case "animation": return $this->animation($sender, $args);
 			case "emote": return $this->emote($sender, $args);
 			case "emotes": case "emote-list": return $this->emotes($sender, $args);
-			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
+			case "hitcommand": return $this->triggerCommand($sender, "left_click", $args);
+			case "interactcommand": return $this->triggerCommand($sender, "right_click", $args);
+			case "interaction-mode": return $this->interactionMode($sender, $args);
+			case "rotation-distance": return $this->rotationDistance($sender, $args);
+			case "playercount": return $this->playerCount($sender, $args);
+			case "block": return $this->block($sender, $args);
+			case "walk": return $this->walk($sender, $args);
+			case "random-emote": return $this->randomEmote($sender, $args);
+			case "rotate": case "particle": case "sound": case "namevisible": return $this->toggle($sender, $subcommand === "namevisible" ? "nametag" : $subcommand, $args);
 			case "tp": return $this->teleport($sender, $args);
 			case "reload": $this->manager->reload(); $sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded."); return true;
 			case "debug": return $this->debug($sender);
@@ -111,28 +126,37 @@ final class NpcCommandHandler{
 		$sender->sendMessage(TextFormat::AQUA . "NPC commands:");
 		foreach([
 			"/npc create <id> [name]",
-			"/slapper spawn <Human|Player> [name]",
+			"/slapper spawn <entity-type> [name]",
 			"/slapper edit <id> <name|addcommand|delcommand|listcommands|scale|tphere|tpto|equipment>",
 			"/npc migrate-slapper [remove]",
 			"/npc remove <id>",
 			"/npc setname <id> <name>",
 			"/npc setline <id> <line> <text>",
-			"/npc addcommand <id> <command|console:command>",
+			"/npc addcommand <id> <command|console:command|message:text>",
+			"/npc hitcommand|interactcommand <id> <action> (after interaction-mode separate)",
 			"/npc clearcommands <id>",
 			"/npc equipment <id> <hand|helmet|chestplate|leggings|boots> <item|clear>",
-			"/npc skin <id> <relative-raw-skin-file|clear>",
+			"/npc skin <id> <relative-raw-skin-file|player|clear>",
+			"/npc skin-url <id> <https-url|clear> (allowlist in config.yml)",
 			"/npc cooldown <id> <seconds>",
 			"/npc scale <id> <size>",
 			"/npc particle-type <id> <flame|heart|smoke|...>",
 			"/npc sound-type <id> <click|pop|door_bump|...>",
 			"/npc menuname <id> <name|remove>",
-			"/npc type <id> <human|bee>",
+			"/npc type <id> <human|any Vanilla mob|falling_block>",
 			"/npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]",
 			"/npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]",
 			"/npc emotes [search]",
+			"/npc random-emote <id> <on|off> [seconds] [emote... ]",
+			"/npc interaction-mode <id> <shared|separate>",
+			"/npc namevisible <id> <on|off>",
+			"/npc rotation-distance <id> <blocks>",
+			"/npc playercount <id> <none|server|world|query> [world|host] [port]",
+			"/npc block <id> <block-id|clear> (use type falling_block)",
+			"/npc walk <id> <on|off|add|clear> [speed]",
 			"/npc ui",
 			"/npc rotate|particle|sound <id> <on|off>",
-			"/npc tp <id> | /npc list | /npc debug | /npc reload"
+			"/npc tp <id> | /npc list | /npc entities | /npc updateall | /npc debug | /npc reload"
 		] as $line){
 			$sender->sendMessage(TextFormat::GRAY . $line);
 		}
@@ -155,8 +179,8 @@ final class NpcCommandHandler{
 			return true;
 		}
 		$type = strtolower((string) array_shift($args));
-		if(!in_array($type, ["human", "player"], true)){
-			$sender->sendMessage(TextFormat::RED . "This compatibility layer currently supports Human/Player NPCs only. Use /npc create for the same core.");
+		if(VanillaMobCatalog::resolve($type) === null){
+			$sender->sendMessage(TextFormat::RED . "Unknown entity type. Use /npc entities.");
 			return true;
 		}
 		$name = trim(implode(" ", $args));
@@ -167,7 +191,8 @@ final class NpcCommandHandler{
 		$id = $this->nextId();
 		try{
 			$this->manager->create($sender, $id, $name);
-			$sender->sendMessage(TextFormat::GREEN . "Human NPC '$id' spawned here.");
+			$this->manager->setEntityType($id, $type);
+			$sender->sendMessage(TextFormat::GREEN . VanillaMobCatalog::displayName($type) . " NPC '$id' spawned here.");
 		}catch(\Throwable $error){
 			$sender->sendMessage(TextFormat::RED . $error->getMessage());
 		}
@@ -229,8 +254,7 @@ final class NpcCommandHandler{
 			case "menuname": case "menu-name":
 				return $this->menuName($sender, [$id, ...$args]);
 			case "namevisible": case "customnamevisible": case "tagvisible":
-				$sender->sendMessage(TextFormat::YELLOW . "NPC name tags are always visible in this implementation.");
-				return true;
+				return $this->toggle($sender, "nametag", [$id, ...$args]);
 			default:
 				$sender->sendMessage(TextFormat::RED . "Unknown edit property. Use /npc help.");
 				return true;
@@ -238,8 +262,14 @@ final class NpcCommandHandler{
 	}
 
 	private function entities(CommandSender $sender) : bool{
-		$sender->sendMessage(TextFormat::AQUA . "Supported NPC entity types: Human, Player");
-		$sender->sendMessage(TextFormat::GRAY . "Other historical Slapper entity types are not silently emulated by the Human core.");
+		$types = VanillaMobCatalog::all();
+		$sender->sendMessage(TextFormat::AQUA . "Supported NPC entity types (" . count($types) . "): " . implode(", ", $types));
+		$sender->sendMessage(TextFormat::GRAY . "Use /npc type <id> <type>. Custom passive actors can register through Main::registerEntityType().");
+		return true;
+	}
+
+	private function updateAll(CommandSender $sender) : bool{
+		$sender->sendMessage(TextFormat::GREEN . "Updated " . $this->manager->updateAll() . " NPC definitions to the current schema.");
 		return true;
 	}
 
@@ -406,6 +436,22 @@ final class NpcCommandHandler{
 	}
 
 	/** @param list<string> $args */
+	private function skinUrl(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$url = trim(implode(" ", $args));
+		if($id === null || $url === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc skin-url <id> <https-url|clear>");
+			return true;
+		}
+		if(strtolower($url) === "clear"){
+			$url = "";
+		}
+		$ok = $this->manager->setSkinUrl($id, $url);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC skin URL saved; download is running asynchronously." : TextFormat::RED . "NPC not found, not Human, or URL is invalid/disabled by the allowlist.");
+		return true;
+	}
+
+	/** @param list<string> $args */
 	private function cooldown(CommandSender $sender, array $args) : bool{
 		$id = array_shift($args); $seconds = array_shift($args);
 		if($id === null || $seconds === null || !is_numeric($seconds)){
@@ -448,8 +494,8 @@ final class NpcCommandHandler{
 	private function entityType(CommandSender $sender, array $args) : bool{
 		$id = array_shift($args);
 		$type = strtolower(array_shift($args) ?? "");
-		if($id === null || !in_array($type, ["human", "player", "bee"], true)){
-			$sender->sendMessage(TextFormat::YELLOW . "/npc type <id> <human|bee>");
+		if($id === null || VanillaMobCatalog::resolve($type) === null){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc type <id> <human|any-vanilla-mob|falling_block>");
 			return true;
 		}
 		$ok = $this->manager->setEntityType($id, $type);
@@ -531,6 +577,130 @@ final class NpcCommandHandler{
 			$sender->sendMessage(TextFormat::GRAY . "- " . $match["title"] . TextFormat::DARK_GRAY . " => " . $match["uuid"]);
 		}
 		$sender->sendMessage(TextFormat::YELLOW . "Use /npc emote <id> <name|UUID> [interval] [trigger]. Duplicate names can use the UUID directly.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function triggerCommand(CommandSender $sender, string $trigger, array $args) : bool{
+		$id = array_shift($args);
+		$action = trim(implode(" ", $args));
+		$definition = $id !== null ? $this->manager->getDefinition($id) : null;
+		if($id === null || $action === "" || $definition === null){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc " . ($trigger === "left_click" ? "hitcommand" : "interactcommand") . " <id> <command|console:command|message:text>");
+			return true;
+		}
+		$commands = $trigger === "left_click" ? $definition->getHitCommands() : $definition->getInteractCommands();
+		$commands[] = $action;
+		$ok = $this->manager->setTriggerCommands($id, $trigger, $commands);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "Trigger action added. Set interaction-mode separate to use it." : TextFormat::RED . "NPC not found.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function interactionMode(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$mode = strtolower(array_shift($args) ?? "");
+		$ok = $id !== null && $this->manager->setInteractionMode($id, $mode);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "Interaction mode updated." : TextFormat::YELLOW . "/npc interaction-mode <id> <shared|separate>");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function rotationDistance(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$value = array_shift($args);
+		$ok = $id !== null && $value !== null && is_numeric($value) && $this->manager->setRotationDistance($id, (float) $value);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC rotation distance updated." : TextFormat::YELLOW . "/npc rotation-distance <id> <blocks>");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function playerCount(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$mode = strtolower(array_shift($args) ?? "");
+		$target = array_shift($args) ?? "";
+		$port = array_shift($args);
+		if($id === null || !in_array($mode, ["none", "server", "world", "query"], true)){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc playercount <id> <none|server|world|query> [world|host] [port]");
+			return true;
+		}
+		$world = $mode === "world" ? $target : "";
+		$host = $mode === "query" ? $target : "";
+		$ok = $this->manager->setPlayerCount($id, $mode, $world, $host, $port !== null && is_numeric($port) ? (int) $port : 19132);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "Player count source updated." : TextFormat::RED . "NPC not found.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function block(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$block = trim(implode(" ", $args));
+		if($id === null || $block === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc block <id> <block-id|clear>");
+			return true;
+		}
+		$ok = $this->manager->setBlockId($id, strtolower($block) === "clear" ? "" : $block);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "Block actor updated. Set type to falling_block." : TextFormat::RED . "NPC or block ID is invalid.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function walk(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$action = strtolower(array_shift($args) ?? "");
+		$definition = $id !== null ? $this->manager->getDefinition($id) : null;
+		if($id === null || $definition === null){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc walk <id> <on|off|add|clear> [speed]");
+			return true;
+		}
+		if($action === "clear"){
+			$this->manager->setWalkPath($id, []);
+			$sender->sendMessage(TextFormat::GREEN . "Walk path cleared.");
+			return true;
+		}
+		if($action === "add"){
+			if(!$sender instanceof Player){
+				$sender->sendMessage(TextFormat::RED . "Adding a walk point must be done by a player.");
+				return true;
+			}
+			$location = $sender->getLocation();
+			$path = $definition->getWalkPath();
+			$path[] = ["world" => $sender->getWorld()->getFolderName(), "x" => $location->x, "y" => $location->y, "z" => $location->z, "yaw" => $location->yaw, "pitch" => $location->pitch];
+			$this->manager->setWalkPath($id, $path);
+			if(isset($args[0]) && is_numeric($args[0])){
+				$this->manager->setWalkSpeed($id, (float) $args[0]);
+			}
+			$sender->sendMessage(TextFormat::GREEN . "Walk point added. Walking remains off until /npc walk $id on.");
+			return true;
+		}
+		if(!in_array($action, ["on", "off"], true)){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc walk <id> <on|off|add|clear> [speed]");
+			return true;
+		}
+		$ok = $this->manager->setBoolean($id, "walk", $action === "on");
+		if(isset($args[0]) && is_numeric($args[0])){
+			$this->manager->setWalkSpeed($id, (float) $args[0]);
+		}
+		$sender->sendMessage($ok ? TextFormat::GREEN . "Walk mode updated." : TextFormat::RED . "NPC not found.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function randomEmote(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$state = strtolower(array_shift($args) ?? "");
+		$cooldown = array_shift($args);
+		$definition = $id !== null ? $this->manager->getDefinition($id) : null;
+		if($id === null || $definition === null || !in_array($state, ["on", "off"], true)){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc random-emote <id> <on|off> [seconds] [emote...]");
+			return true;
+		}
+		$pool = $args;
+		if($pool === []){
+			$pool = $definition->getEmotePool();
+		}
+		$ok = $this->manager->setEmotePool($id, $pool, $state === "on", $cooldown !== null && is_numeric($cooldown) ? (float) $cooldown : $definition->getRandomEmoteCooldown());
+		$sender->sendMessage($ok ? TextFormat::GREEN . "Random emote mode updated." : TextFormat::RED . "NPC is not a Human or was not found.");
 		return true;
 	}
 

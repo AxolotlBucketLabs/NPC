@@ -7,6 +7,7 @@ namespace NhanAZ\NPC\model;
 use InvalidArgumentException;
 use function array_values;
 use function count;
+use function array_filter;
 use function in_array;
 use function is_array;
 use function is_finite;
@@ -32,10 +33,26 @@ final class NpcDefinition{
 	/** @var array<string, string> */
 	private array $equipment;
 
+	/** @var list<string> */
+	private array $hitCommands;
+
+	/** @var list<string> */
+	private array $interactCommands;
+
+	/** @var list<array{world: string, x: float, y: float, z: float, yaw: float, pitch: float}> */
+	private array $walkPath;
+
+	/** @var list<string> */
+	private array $emotePool;
+
 	/**
 	 * @param array<int|string, mixed> $lines
 	 * @param array<int|string, mixed> $commands
 	 * @param array<int|string, mixed> $equipment
+	 * @param list<string> $hitCommands
+	 * @param list<string> $interactCommands
+	 * @param list<array{world: string, x: float, y: float, z: float, yaw?: float, pitch?: float}> $walkPath
+	 * @param list<string> $emotePool
 	 */
 	public function __construct(
 		private readonly string $id,
@@ -64,7 +81,26 @@ final class NpcDefinition{
 		private string $animationType = "none",
 		private string $animationId = "",
 		private int $animationInterval = 100,
-		private string $animationTrigger = "timer"
+		private string $animationTrigger = "timer",
+		private string $skinUrl = "",
+		array $hitCommands = [],
+		array $interactCommands = [],
+		private string $interactionMode = "shared",
+		private bool $nametagVisible = true,
+		private float $rotationDistance = 16.0,
+		private bool $walkEnabled = false,
+		private float $walkSpeed = 0.06,
+		array $walkPath = [],
+		private bool $walkLoop = true,
+		private bool $randomEmoteEnabled = false,
+		private float $randomEmoteCooldown = 60.0,
+		array $emotePool = [],
+		private string $playerCountMode = "server",
+		private string $playerCountWorld = "",
+		private string $queryHost = "",
+		private int $queryPort = 19132,
+		private int $queryInterval = 200,
+		private string $blockId = ""
 	){
 		self::validateId($id);
 		$this->lines = self::normalizeLines($lines);
@@ -81,6 +117,19 @@ final class NpcDefinition{
 		$this->animationId = self::normalizeAnimationId($animationId);
 		$this->animationInterval = self::normalizeAnimationInterval($animationInterval);
 		$this->animationTrigger = self::normalizeAnimationTrigger($animationTrigger);
+		$this->skinUrl = self::normalizeUrl($skinUrl);
+		$this->hitCommands = self::normalizeCommands($hitCommands);
+		$this->interactCommands = self::normalizeCommands($interactCommands);
+		$this->interactionMode = self::normalizeInteractionMode($interactionMode);
+		$this->rotationDistance = self::normalizeRotationDistance($rotationDistance);
+		$this->walkSpeed = self::normalizeWalkSpeed($walkSpeed);
+		$this->walkPath = self::normalizeWalkPath($walkPath);
+		$this->randomEmoteCooldown = self::normalizeRandomEmoteCooldown($randomEmoteCooldown);
+		$this->emotePool = self::normalizeEmotePool($emotePool);
+		$this->playerCountMode = self::normalizePlayerCountMode($playerCountMode);
+		$this->queryPort = self::normalizePort($queryPort);
+		$this->queryInterval = self::normalizeQueryInterval($queryInterval);
+		$this->blockId = self::normalizeBlockId($blockId);
 	}
 
 	/** @param array<int|string, mixed> $data */
@@ -112,7 +161,26 @@ final class NpcDefinition{
 			self::stringValue($data, "animation-type", "none"),
 			self::stringValue($data, "animation-id", ""),
 			self::intValue($data, "animation-interval", 100),
-			self::stringValue($data, "animation-trigger", "timer")
+			self::stringValue($data, "animation-trigger", "timer"),
+			self::stringValue($data, "skin-url", ""),
+			self::normalizeCommands(is_array($data["hit-commands"] ?? null) ? $data["hit-commands"] : []),
+			self::normalizeCommands(is_array($data["interact-commands"] ?? null) ? $data["interact-commands"] : []),
+			self::stringValue($data, "interaction-mode", "shared"),
+			self::boolValue($data, "nametag-visible", true),
+			self::floatValue($data, "rotation-distance", 16.0),
+			self::boolValue($data, "walk-enabled", false),
+			self::floatValue($data, "walk-speed", 0.06),
+			self::normalizeWalkPath(is_array($data["walk-path"] ?? null) ? $data["walk-path"] : []),
+			self::boolValue($data, "walk-loop", true),
+			self::boolValue($data, "random-emote-enabled", false),
+			self::floatValue($data, "random-emote-cooldown", 60.0),
+			self::normalizeEmotePool(is_array($data["emote-pool"] ?? null) ? $data["emote-pool"] : []),
+			self::stringValue($data, "player-count-mode", "server"),
+			self::stringValue($data, "player-count-world", ""),
+			self::stringValue($data, "query-host", ""),
+			self::intValue($data, "query-port", 19132),
+			self::intValue($data, "query-interval", 200),
+			self::stringValue($data, "block-id", "")
 		);
 	}
 
@@ -135,6 +203,7 @@ final class NpcDefinition{
 			"equipment" => $this->equipment,
 			"skin" => $this->skinFile,
 			"cape" => $this->capeFile,
+			"skin-url" => $this->skinUrl,
 			"geometry-name" => $this->geometryName,
 			"geometry-data" => $this->geometryData,
 			"particle-type" => $this->particleType,
@@ -144,7 +213,25 @@ final class NpcDefinition{
 			"animation-type" => $this->animationType,
 			"animation-id" => $this->animationId,
 			"animation-interval" => $this->animationInterval,
-			"animation-trigger" => $this->animationTrigger
+			"animation-trigger" => $this->animationTrigger,
+			"hit-commands" => $this->hitCommands,
+			"interact-commands" => $this->interactCommands,
+			"interaction-mode" => $this->interactionMode,
+			"nametag-visible" => $this->nametagVisible,
+			"rotation-distance" => $this->rotationDistance,
+			"walk-enabled" => $this->walkEnabled,
+			"walk-speed" => $this->walkSpeed,
+			"walk-path" => $this->walkPath,
+			"walk-loop" => $this->walkLoop,
+			"random-emote-enabled" => $this->randomEmoteEnabled,
+			"random-emote-cooldown" => $this->randomEmoteCooldown,
+			"emote-pool" => $this->emotePool,
+			"player-count-mode" => $this->playerCountMode,
+			"player-count-world" => $this->playerCountWorld,
+			"query-host" => $this->queryHost,
+			"query-port" => $this->queryPort,
+			"query-interval" => $this->queryInterval,
+			"block-id" => $this->blockId
 		];
 	}
 
@@ -168,6 +255,7 @@ final class NpcDefinition{
 	public function getEquipment() : array{ return $this->equipment; }
 	public function getSkinFile() : string{ return $this->skinFile; }
 	public function getCapeFile() : string{ return $this->capeFile; }
+	public function getSkinUrl() : string{ return $this->skinUrl; }
 	public function getGeometryName() : string{ return $this->geometryName; }
 	public function getGeometryData() : string{ return $this->geometryData; }
 	public function getParticleType() : string{ return $this->particleType; }
@@ -178,6 +266,28 @@ final class NpcDefinition{
 	public function getAnimationId() : string{ return $this->animationId; }
 	public function getAnimationInterval() : int{ return $this->animationInterval; }
 	public function getAnimationTrigger() : string{ return $this->animationTrigger; }
+	/** @return list<string> */
+	public function getHitCommands() : array{ return $this->hitCommands; }
+	/** @return list<string> */
+	public function getInteractCommands() : array{ return $this->interactCommands; }
+	public function getInteractionMode() : string{ return $this->interactionMode; }
+	public function isNametagVisible() : bool{ return $this->nametagVisible; }
+	public function getRotationDistance() : float{ return $this->rotationDistance; }
+	public function isWalkEnabled() : bool{ return $this->walkEnabled; }
+	public function getWalkSpeed() : float{ return $this->walkSpeed; }
+	/** @return list<array{world: string, x: float, y: float, z: float, yaw: float, pitch: float}> */
+	public function getWalkPath() : array{ return $this->walkPath; }
+	public function isWalkLoop() : bool{ return $this->walkLoop; }
+	public function isRandomEmoteEnabled() : bool{ return $this->randomEmoteEnabled; }
+	public function getRandomEmoteCooldown() : float{ return $this->randomEmoteCooldown; }
+	/** @return list<string> */
+	public function getEmotePool() : array{ return $this->emotePool; }
+	public function getPlayerCountMode() : string{ return $this->playerCountMode; }
+	public function getPlayerCountWorld() : string{ return $this->playerCountWorld; }
+	public function getQueryHost() : string{ return $this->queryHost; }
+	public function getQueryPort() : int{ return $this->queryPort; }
+	public function getQueryInterval() : int{ return $this->queryInterval; }
+	public function getBlockId() : string{ return $this->blockId; }
 
 	/** @param array<int|string, mixed> $lines */
 	public function setLines(array $lines) : void{ $this->lines = self::normalizeLines($lines); }
@@ -212,6 +322,7 @@ final class NpcDefinition{
 	}
 	public function setSkinFile(string $skinFile) : void{ $this->skinFile = self::normalizeAssetPath($skinFile); }
 	public function setCapeFile(string $capeFile) : void{ $this->capeFile = self::normalizeAssetPath($capeFile); }
+	public function setSkinUrl(string $skinUrl) : void{ $this->skinUrl = self::normalizeUrl($skinUrl); }
 	public function setGeometry(string $name, string $data) : void{
 		$this->geometryName = self::normalizeGeometryName($name);
 		$this->geometryData = self::normalizeGeometryData($data);
@@ -229,6 +340,30 @@ final class NpcDefinition{
 		$this->animationInterval = self::normalizeAnimationInterval($interval);
 		$this->animationTrigger = self::normalizeAnimationTrigger($trigger);
 	}
+	/** @param array<int|string, mixed> $commands */
+	public function setHitCommands(array $commands) : void{ $this->hitCommands = self::normalizeCommands($commands); }
+	/** @param array<int|string, mixed> $commands */
+	public function setInteractCommands(array $commands) : void{ $this->interactCommands = self::normalizeCommands($commands); }
+	public function setInteractionMode(string $mode) : void{ $this->interactionMode = self::normalizeInteractionMode($mode); }
+	public function setNametagVisible(bool $visible) : void{ $this->nametagVisible = $visible; }
+	public function setRotationDistance(float $distance) : void{ $this->rotationDistance = self::normalizeRotationDistance($distance); }
+	public function setWalkEnabled(bool $enabled) : void{ $this->walkEnabled = $enabled; }
+	public function setWalkSpeed(float $speed) : void{ $this->walkSpeed = self::normalizeWalkSpeed($speed); }
+	/** @param array<int|string, mixed> $path */
+	public function setWalkPath(array $path) : void{ $this->walkPath = self::normalizeWalkPath($path); }
+	public function setWalkLoop(bool $loop) : void{ $this->walkLoop = $loop; }
+	public function setRandomEmoteEnabled(bool $enabled) : void{ $this->randomEmoteEnabled = $enabled; }
+	public function setRandomEmoteCooldown(float $cooldown) : void{ $this->randomEmoteCooldown = self::normalizeRandomEmoteCooldown($cooldown); }
+	/** @param array<int|string, mixed> $pool */
+	public function setEmotePool(array $pool) : void{ $this->emotePool = self::normalizeEmotePool($pool); }
+	public function setPlayerCountMode(string $mode) : void{ $this->playerCountMode = self::normalizePlayerCountMode($mode); }
+	public function setPlayerCountWorld(string $world) : void{ $this->playerCountWorld = substr(str_replace(["\r", "\n"], " ", trim($world)), 0, 128); }
+	public function setQueryTarget(string $host, int $port = 19132, int $interval = 200) : void{
+		$this->queryHost = substr(str_replace(["\r", "\n"], "", trim($host)), 0, 253);
+		$this->queryPort = self::normalizePort($port);
+		$this->queryInterval = self::normalizeQueryInterval($interval);
+	}
+	public function setBlockId(string $blockId) : void{ $this->blockId = self::normalizeBlockId($blockId); }
 
 	private static function validateId(string $id) : void{
 		if(preg_match('/^[A-Za-z0-9._-]{1,32}$/D', $id) !== 1){
@@ -304,6 +439,14 @@ final class NpcDefinition{
 		return $path;
 	}
 
+	private static function normalizeUrl(string $url) : string{
+		$url = trim($url);
+		if(strlen($url) > 2048 || preg_match('/^https:\/\/[^\s]+$/iD', $url) !== 1){
+			return "";
+		}
+		return $url;
+	}
+
 	private static function normalizeGeometryName(string $name) : string{
 		return substr(trim($name), 0, 256);
 	}
@@ -318,11 +461,7 @@ final class NpcDefinition{
 	}
 
 	private static function normalizeEntityType(string $type) : string{
-		$type = strtolower(trim($type));
-		return match($type){
-			"bee" => "bee",
-			default => "human"
-		};
+		return VanillaMobCatalog::resolve($type) ?? "human";
 	}
 
 	private static function normalizeAnimationType(string $type) : string{
@@ -342,6 +481,91 @@ final class NpcDefinition{
 	private static function normalizeAnimationTrigger(string $trigger) : string{
 		$trigger = strtolower(str_replace("-", "_", trim($trigger)));
 		return in_array($trigger, ["timer", "spawn", "right_click", "left_click"], true) ? $trigger : "timer";
+	}
+
+	private static function normalizeInteractionMode(string $mode) : string{
+		$mode = strtolower(str_replace("-", "_", trim($mode)));
+		return in_array($mode, ["shared", "separate"], true) ? $mode : "shared";
+	}
+
+	private static function normalizeRotationDistance(float $distance) : float{
+		return is_finite($distance) ? min(256.0, max(0.0, $distance)) : 16.0;
+	}
+
+	private static function normalizeWalkSpeed(float $speed) : float{
+		return is_finite($speed) ? min(2.0, max(0.001, $speed)) : 0.06;
+	}
+
+	/**
+	 * @param array<int|string, mixed> $path
+	 * @return list<array{world: string, x: float, y: float, z: float, yaw: float, pitch: float}>
+	 */
+	private static function normalizeWalkPath(array $path) : array{
+		/** @var list<array{world: string, x: float, y: float, z: float, yaw: float, pitch: float}> $result */
+		$result = [];
+		foreach(array_values($path) as $point){
+			if(!is_array($point)){
+				continue;
+			}
+			$world = self::stringValue($point, "world", "");
+			if($world === ""){
+				continue;
+			}
+			$result[] = [
+				"world" => substr(str_replace(["\r", "\n"], " ", trim($world)), 0, 128),
+				"x" => self::floatValue($point, "x", 0.0),
+				"y" => self::floatValue($point, "y", 0.0),
+				"z" => self::floatValue($point, "z", 0.0),
+				"yaw" => self::floatValue($point, "yaw", 0.0),
+				"pitch" => self::floatValue($point, "pitch", 0.0)
+			];
+			if(count($result) >= 64){
+				break;
+			}
+		}
+		return $result;
+	}
+
+	private static function normalizeRandomEmoteCooldown(float $cooldown) : float{
+		return is_finite($cooldown) ? min(86400.0, max(1.0, $cooldown)) : 60.0;
+	}
+
+	/**
+	 * @param array<int|string, mixed> $pool
+	 * @return list<string>
+	 */
+	private static function normalizeEmotePool(array $pool) : array{
+		/** @var list<string> $result */
+		$result = [];
+		foreach(array_values($pool) as $emote){
+			if(is_string($emote) && trim($emote) !== ""){
+				$result[] = substr(str_replace(["\r", "\n"], "", trim($emote)), 0, 128);
+			}
+			if(count($result) >= 128){
+				break;
+			}
+		}
+		$normalized = array_values(array_unique($result));
+		/** @var list<string> $normalized */
+		return $normalized;
+	}
+
+	private static function normalizePlayerCountMode(string $mode) : string{
+		$mode = strtolower(str_replace("-", "_", trim($mode)));
+		return in_array($mode, ["none", "server", "world", "query"], true) ? $mode : "server";
+	}
+
+	private static function normalizePort(int $port) : int{
+		return min(65535, max(1, $port));
+	}
+
+	private static function normalizeQueryInterval(int $interval) : int{
+		return min(86400, max(20, $interval));
+	}
+
+	private static function normalizeBlockId(string $blockId) : string{
+		$blockId = strtolower(trim($blockId));
+		return preg_match('/^[a-z0-9_.-]+(?::[a-z0-9_.-]+)?$/D', $blockId) === 1 ? $blockId : "";
 	}
 
 	private static function normalizeCooldown(float $cooldown) : float{

@@ -6,12 +6,17 @@ namespace NhanAZ\NPC\manager;
 
 use NhanAZ\NPC\entity\NpcEntity;
 use NhanAZ\NPC\entity\MobNpcEntity;
+use NhanAZ\NPC\entity\BlockNpcEntity;
 use NhanAZ\NPC\model\EmoteCatalog;
 use NhanAZ\NPC\model\NpcDefinition;
+use NhanAZ\NPC\model\VanillaMobCatalog;
+use NhanAZ\NPC\task\SkinFetchTask;
+use pocketmine\block\Block;
 use pocketmine\console\ConsoleCommandSender;
 use pocketmine\entity\Entity;
 use pocketmine\entity\Human;
 use pocketmine\entity\Living;
+use pocketmine\entity\EntitySizeInfo;
 use pocketmine\entity\Skin;
 use pocketmine\entity\animation\ArmSwingAnimation;
 use pocketmine\entity\animation\CriticalHitAnimation;
@@ -45,6 +50,16 @@ use pocketmine\world\sound\TotemUseSound;
 use pocketmine\Server;
 use NhanAZ\NPC\Main;
 use function atan2;
+use function array_rand;
+use function array_filter;
+use function array_values;
+use function floor;
+use function is_finite;
+use function is_int;
+use function is_object;
+use function json_encode;
+use function mt_rand;
+use function random_int;
 use function count;
 use function deg2rad;
 use function file_get_contents;
@@ -69,10 +84,11 @@ use function trim;
 use const DIRECTORY_SEPARATOR;
 
 final class NpcManager{
+	private const DATA_VERSION = 2;
 	/** @var array<string, NpcDefinition> */
 	private array $definitions = [];
 
-	/** @var array<string, NpcEntity|MobNpcEntity> */
+	/** @var array<string, NpcEntity|MobNpcEntity|BlockNpcEntity> */
 	private array $entities = [];
 
 	/** @var array<string, array<string, float>> */
@@ -86,6 +102,21 @@ final class NpcManager{
 
 	private string $dataFile;
 
+	/** @var array<string, array{ok: bool, players: int, max: int, status: string}> */
+	private array $queryResults = [];
+
+	/** @var array<string, true> */
+	private array $queryInFlight = [];
+
+	/** @var array<string, int> */
+	private array $walkIndices = [];
+
+	/** @var array<string, float> */
+	private array $lastRandomEmote = [];
+
+	/** @var array<string, true> */
+	private array $skinFetchInFlight = [];
+
 	public function __construct(private Main $plugin){
 		$this->dataFile = $plugin->getDataFolder() . "npcs.yml";
 	}
@@ -94,7 +125,8 @@ final class NpcManager{
 		$this->despawnAll();
 		$this->definitions = [];
 
-		$config = new Config($this->dataFile, Config::YAML, ["version" => 1, "npcs" => []]);
+		$config = new Config($this->dataFile, Config::YAML, ["version" => self::DATA_VERSION, "npcs" => []]);
+		$version = is_int($config->get("version")) ? $config->get("version") : 1;
 		$rawNpcs = $config->get("npcs", []);
 		if(!is_array($rawNpcs)){
 			$this->plugin->getLogger()->warning("npcs.yml has an invalid 'npcs' section; ignoring it");
@@ -112,16 +144,28 @@ final class NpcManager{
 				$this->plugin->getLogger()->warning("Skipping NPC '$id': " . $error->getMessage());
 			}
 		}
+		if($version < self::DATA_VERSION){
+			$this->save();
+		}
 	}
 
 	public function save() : void{
-		$data = ["version" => 1, "npcs" => []];
+		$data = ["version" => self::DATA_VERSION, "npcs" => []];
 		foreach($this->definitions as $id => $definition){
 			$data["npcs"][$id] = $definition->toArray();
 		}
 		$config = new Config($this->dataFile, Config::YAML, $data);
 		$config->setAll($data);
 		$config->save();
+	}
+
+	/** Rewrites every loaded definition using the current schema and respawns it. */
+	public function updateAll() : int{
+		$count = count($this->definitions);
+		$this->save();
+		$this->despawnAll();
+		$this->spawnAll();
+		return $count;
 	}
 
 	public function spawnAll() : void{
@@ -139,6 +183,9 @@ final class NpcManager{
 		$this->entities = [];
 		$this->idSessions = [];
 		$this->removeSessions = [];
+		$this->walkIndices = [];
+		$this->lastRandomEmote = [];
+		$this->skinFetchInFlight = [];
 	}
 
 	public function tick() : void{
@@ -155,6 +202,15 @@ final class NpcManager{
 			if($entity instanceof MobNpcEntity && $definition->getAnimationType() === "fly"){
 				$entity->tickFlight($tick);
 			}
+			if($definition->isWalkEnabled() && $definition->getWalkPath() !== [] && $tick % 2 === 0){
+				$this->tickWalking($definition, $entity);
+			}
+			if($definition->isRandomEmoteEnabled() && $definition->getEmotePool() !== [] && $tick % 20 === 0){
+				$this->tickRandomEmote($definition, $entity);
+			}
+			if($definition->getPlayerCountMode() === "query" && $definition->getQueryHost() !== "" && $tick % $definition->getQueryInterval() === 0){
+				$this->queryPlayerCount($definition);
+			}
 
 			if($definition->getAnimationTrigger() === "timer" && $tick % $definition->getAnimationInterval() === 0){
 				$this->playAnimation($entity, $definition);
@@ -164,6 +220,7 @@ final class NpcManager{
 				continue;
 			}
 			$entity->setNameTag($this->renderLines($definition));
+			$entity->setNameTagVisible($definition->isNametagVisible());
 			if($definition->isRotateEnabled()){
 				$this->rotateTowardsNearestPlayer($entity);
 			}
@@ -218,8 +275,8 @@ final class NpcManager{
 		return $removed;
 	}
 
-	/** @return NpcEntity|MobNpcEntity|null */
-	public function spawn(NpcDefinition $definition) : NpcEntity|MobNpcEntity|null{
+	/** @return NpcEntity|MobNpcEntity|BlockNpcEntity|null */
+	public function spawn(NpcDefinition $definition) : NpcEntity|MobNpcEntity|BlockNpcEntity|null{
 		$world = $this->plugin->getServer()->getWorldManager()->getWorldByName($definition->getWorld());
 		if($world === null){
 			$this->plugin->getLogger()->warning("World '" . $definition->getWorld() . "' for NPC '" . $definition->getId() . "' is not loaded");
@@ -237,15 +294,30 @@ final class NpcManager{
 			$definition->getYaw(),
 			$definition->getPitch()
 		);
-		$entity = $definition->getEntityType() === "bee"
-			? new MobNpcEntity($location, $definition->getId(), "minecraft:bee")
-			: new NpcEntity($location, $definition->getId(), $this->loadSkin($definition), $definition->getMenuName());
+		$entityType = VanillaMobCatalog::resolve($definition->getEntityType()) ?? "human";
+		if($entityType === "falling_block"){
+			$block = $this->parseBlock($definition->getBlockId());
+			if($block === null){
+				$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' needs a valid block-id for falling_block; using Human fallback");
+				$entity = new NpcEntity($location, $definition->getId(), $this->loadSkin($definition), $definition->getMenuName());
+			}else{
+				$entity = new BlockNpcEntity($location, $definition->getId(), $block);
+			}
+		}elseif($entityType !== "human"){
+			$networkId = VanillaMobCatalog::networkId($entityType);
+			if($networkId === null){
+				return null;
+			}
+			$entity = new MobNpcEntity($location, $definition->getId(), $networkId, $this->canFly($entityType));
+		}else{
+			$entity = new NpcEntity($location, $definition->getId(), $this->loadSkin($definition), $definition->getMenuName());
+		}
 		$entity->setScale($definition->getScale());
 		if($entity instanceof NpcEntity){
 			$this->applyEquipment($entity, $definition);
 		}
 		$entity->setNameTag($this->renderLines($definition));
-		$entity->setNameTagVisible(true);
+		$entity->setNameTagVisible($definition->isNametagVisible());
 		$entity->setNameTagAlwaysVisible(true);
 		$this->entities[$definition->getId()] = $entity;
 		if($definition->getAnimationTrigger() === "spawn"){
@@ -324,10 +396,11 @@ final class NpcManager{
 
 	public function setEntityType(string $id, string $entityType) : bool{
 		$definition = $this->definitions[$id] ?? null;
-		if($definition === null || !in_array(strtolower($entityType), ["human", "player", "bee"], true)){
+		$resolved = VanillaMobCatalog::resolve($entityType);
+		if($definition === null || $resolved === null){
 			return false;
 		}
-		$definition->setEntityType($entityType);
+		$definition->setEntityType($resolved);
 		$this->save();
 		$this->respawn($id);
 		return true;
@@ -385,7 +458,7 @@ final class NpcManager{
 
 	public function setSkinFile(string $id, string $file) : bool{
 		$definition = $this->definitions[$id] ?? null;
-		if($definition === null || $definition->getEntityType() === "bee"){
+		if($definition === null || !VanillaMobCatalog::isHuman($definition->getEntityType())){
 			return false;
 		}
 		$definition->setSkinFile($file);
@@ -396,7 +469,7 @@ final class NpcManager{
 
 	public function setSkinFromPlayer(Player $player, string $id) : bool{
 		$definition = $this->definitions[$id] ?? null;
-		if($definition === null || $definition->getEntityType() === "bee"){
+		if($definition === null || !VanillaMobCatalog::isHuman($definition->getEntityType())){
 			return false;
 		}
 		$stored = $this->persistSkin($player->getSkin(), $id);
@@ -450,8 +523,130 @@ final class NpcManager{
 			case "rotate": $definition->setRotate($value); break;
 			case "particle": $definition->setParticle($value); break;
 			case "sound": $definition->setSound($value); break;
+			case "nametag": $definition->setNametagVisible($value); break;
+			case "walk": $definition->setWalkEnabled($value); break;
+			case "random_emote": $definition->setRandomEmoteEnabled($value); break;
 			default: return false;
 		}
+		$this->save();
+		return true;
+	}
+
+	public function setRotationDistance(string $id, float $distance) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !is_finite($distance)){
+			return false;
+		}
+		$definition->setRotationDistance($distance);
+		$this->save();
+		return true;
+	}
+
+	public function setInteractionMode(string $id, string $mode) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !in_array(strtolower($mode), ["shared", "separate"], true)){
+			return false;
+		}
+		$definition->setInteractionMode($mode);
+		$this->save();
+		return true;
+	}
+
+	/** @param array<int, mixed> $commands */
+	public function setTriggerCommands(string $id, string $trigger, array $commands) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		if($trigger === "left_click"){
+			$definition->setHitCommands($commands);
+		}elseif($trigger === "right_click"){
+			$definition->setInteractCommands($commands);
+		}else{
+			return false;
+		}
+		$this->save();
+		return true;
+	}
+
+	public function setNametagVisible(string $id, bool $visible) : bool{
+		if(!$this->setBoolean($id, "nametag", $visible)){
+			return false;
+		}
+		$entity = $this->entities[$id] ?? null;
+		if($entity !== null && !$entity->isClosed()){
+			$entity->setNameTagVisible($visible);
+		}
+		return true;
+	}
+
+	public function setSkinUrl(string $id, string $url) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !VanillaMobCatalog::isHuman($definition->getEntityType())){
+			return false;
+		}
+		$definition->setSkinUrl($url);
+		if($url !== ""){
+			$definition->setSkinFile("");
+		}
+		$this->save();
+		$this->fetchSkinUrl($definition);
+		return true;
+	}
+
+	public function setPlayerCount(string $id, string $mode, string $world = "", string $host = "", int $port = 19132, int $interval = 200) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		$definition->setPlayerCountMode($mode);
+		$definition->setPlayerCountWorld($world);
+		$definition->setQueryTarget($host, $port, $interval);
+		$this->save();
+		return true;
+	}
+
+	public function setBlockId(string $id, string $blockId) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		$definition->setBlockId($blockId);
+		$this->save();
+		$this->respawn($id);
+		return true;
+	}
+
+	/** @param array<int, mixed> $path */
+	public function setWalkPath(string $id, array $path) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		$definition->setWalkPath($path);
+		$this->save();
+		return true;
+	}
+
+	public function setWalkSpeed(string $id, float $speed) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !is_finite($speed)){
+			return false;
+		}
+		$definition->setWalkSpeed($speed);
+		$this->save();
+		return true;
+	}
+
+	/** @param array<int, mixed> $pool */
+	public function setEmotePool(string $id, array $pool, bool $enabled = true, float $cooldown = 60.0) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !VanillaMobCatalog::isHuman($definition->getEntityType())){
+			return false;
+		}
+		$definition->setEmotePool($pool);
+		$definition->setRandomEmoteEnabled($enabled);
+		$definition->setRandomEmoteCooldown($cooldown);
 		$this->save();
 		return true;
 	}
@@ -608,14 +803,14 @@ final class NpcManager{
 
 	public function handleInteract(PlayerEntityInteractEvent $event) : void{
 		$entity = $event->getEntity();
-		if(!($entity instanceof NpcEntity || $entity instanceof MobNpcEntity) || !isset($this->entities[$entity->getNpcId()])){
+		if(!($entity instanceof NpcEntity || $entity instanceof MobNpcEntity || $entity instanceof BlockNpcEntity) || !isset($this->entities[$entity->getNpcId()])){
 			return;
 		}
 		$event->cancel();
 		$this->handleInteraction($entity, $event->getPlayer(), "right_click");
 	}
 
-	public function handleHit(NpcEntity|MobNpcEntity $entity, Player $player) : void{
+	public function handleHit(NpcEntity|MobNpcEntity|BlockNpcEntity $entity, Player $player) : void{
 		if(!isset($this->entities[$entity->getNpcId()])){
 			return;
 		}
@@ -653,7 +848,7 @@ final class NpcManager{
 		return $hadSession;
 	}
 
-	private function handleInteraction(NpcEntity|MobNpcEntity $entity, Player $player, string $trigger) : void{
+	private function handleInteraction(NpcEntity|MobNpcEntity|BlockNpcEntity $entity, Player $player, string $trigger) : void{
 		$definition = $this->definitions[$entity->getNpcId()] ?? null;
 		if($definition === null){
 			return;
@@ -672,18 +867,21 @@ final class NpcManager{
 		if($definition->isSoundEnabled()){
 			$entity->getWorld()->addSound($entity->getPosition(), $this->createSound($definition->getSoundType()), [$player]);
 		}
-		$this->executeCommands($definition, $player);
+		$this->executeCommands($definition, $player, $trigger);
 	}
 
-	private function playAnimation(Living $entity, NpcDefinition $definition) : void{
+	private function playAnimation(NpcEntity|MobNpcEntity|BlockNpcEntity $entity, NpcDefinition $definition) : void{
 		if($entity instanceof MobNpcEntity){
 			$entity->playAnimation($definition->getAnimationType(), $definition->getAnimationId());
+			return;
+		}
+		if(!($entity instanceof NpcEntity)){
 			return;
 		}
 		switch($definition->getAnimationType()){
 			case "emote":
 				$emoteId = EmoteCatalog::resolve($definition->getAnimationId());
-				if($entity instanceof NpcEntity && $emoteId !== null){
+				if($emoteId !== null){
 					$entity->emote($emoteId);
 				}
 				break;
@@ -716,6 +914,12 @@ final class NpcManager{
 		}
 		if($tag === "npc.ids"){
 			return implode(",", array_keys($actors));
+		}
+		if($tag === "npc.server_players"){
+			return (string) count($this->plugin->getServer()->getOnlinePlayers());
+		}
+		if($tag === "npc.world_players"){
+			return (string) count($world->getPlayers());
 		}
 		$nearestId = null;
 		$nearestEntity = null;
@@ -763,18 +967,22 @@ final class NpcManager{
 		];
 		foreach($this->definitions as $id => $definition){
 			$entity = $this->entities[$id] ?? null;
+			$query = $this->queryResults[$id] ?? null;
 			$lines[] = sprintf(
-				"%s: world=%s entity=%s lines=%d actions=%d equipment=%d skin=%s cooldown=%.2f particle=%s sound=%s",
+				"%s: world=%s type=%s entity=%s lines=%d actions=%d equipment=%d skin=%s cooldown=%.2f interaction=%s nametag=%s rotate=%.1f count=%s",
 				$id,
 				$definition->getWorld(),
+				$definition->getEntityType(),
 				$entity !== null && !$entity->isClosed() ? "yes" : "no",
 				count($definition->getLines()),
 				count($definition->getCommands()),
 				count($definition->getEquipment()),
 				$definition->getSkinFile() === "" ? "default" : $definition->getSkinFile(),
 				$definition->getCooldown(),
-				$definition->getParticleType(),
-				$definition->getSoundType() . " menu=" . ($definition->getMenuName() === "" ? "none" : $definition->getMenuName())
+				$definition->getInteractionMode(),
+				$definition->isNametagVisible() ? "yes" : "no",
+				$definition->getRotationDistance(),
+				$query === null ? "n/a" : ($query["players"] . "/" . $query["max"] . " " . $query["status"])
 			);
 		}
 		return $lines;
@@ -790,11 +998,22 @@ final class NpcManager{
 
 	private function renderLines(NpcDefinition $definition) : string{
 		$online = (string) count($this->plugin->getServer()->getOnlinePlayers());
+		$worldOnline = (string) count(array_filter(
+			$this->plugin->getServer()->getOnlinePlayers(),
+			static fn(Player $player) : bool => $player->getWorld()->getFolderName() === $definition->getWorld()
+		));
+		$query = $this->queryResults[$definition->getId()] ?? ["ok" => false, "players" => 0, "max" => 0, "status" => "offline"];
+		$selectedCount = match($definition->getPlayerCountMode()){
+			"world" => $worldOnline,
+			"query" => (string) $query["players"],
+			"none" => "",
+			default => $online
+		};
 		$lines = [];
 		foreach($definition->getLines() as $line){
 			$line = str_replace(
-				["{npc}", "{world}", "{online}", "{players}"],
-				[$definition->getId(), $definition->getWorld(), $online, $online],
+				["{npc}", "{world}", "{online}", "{players}", "{server_players}", "{world_players}", "{player_count}", "{query_players}", "{query_max}", "{query_status}"],
+				[$definition->getId(), $definition->getWorld(), $online, $selectedCount, $online, $worldOnline, $selectedCount, (string) $query["players"], (string) $query["max"], $query["status"]],
 				$line
 			);
 			$lines[] = TextFormat::colorize($line);
@@ -802,14 +1021,20 @@ final class NpcManager{
 		return implode("\n", $lines);
 	}
 
-	private function executeCommands(NpcDefinition $definition, Player $player) : void{
+	private function executeCommands(NpcDefinition $definition, Player $player, string $trigger = "shared") : void{
 		$placeholders = $this->resolvePlayerPlaceholders($definition, $player);
-		foreach($definition->getCommands() as $configured){
+		$commands = $definition->getCommands();
+		if($definition->getInteractionMode() === "separate"){
+			$commands = array_merge($commands, $trigger === "left_click" ? $definition->getHitCommands() : $definition->getInteractCommands());
+		}
+		foreach($commands as $configured){
 			$command = str_replace(array_keys($placeholders), array_values($placeholders), trim($configured));
 			if($command === ""){
 				continue;
 			}
-			if(str_starts_with(strtolower($command), "console:")){
+			if(str_starts_with(strtolower($command), "message:")){
+				$player->sendMessage(TextFormat::colorize(trim(substr($command, 8))));
+			}elseif(str_starts_with(strtolower($command), "console:")){
 				$command = trim(substr($command, 8));
 				if($command !== ""){
 					$this->plugin->getServer()->dispatchCommand(
@@ -962,6 +1187,9 @@ final class NpcManager{
 	}
 
 	private function loadSkin(NpcDefinition $definition) : Skin{
+		if($definition->getSkinUrl() !== "" && $definition->getSkinFile() === ""){
+			$this->fetchSkinUrl($definition);
+		}
 		$skinData = $this->readSkinAsset($definition->getSkinFile(), max(Skin::ACCEPTED_SKIN_SIZES));
 		if($skinData === "" || !in_array(strlen($skinData), Skin::ACCEPTED_SKIN_SIZES, true)){
 			if($definition->getSkinFile() !== ""){
@@ -986,6 +1214,65 @@ final class NpcManager{
 			$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' skin rejected: " . $error->getMessage());
 			return NpcEntity::defaultSkin();
 		}
+	}
+
+	private function fetchSkinUrl(NpcDefinition $definition) : void{
+		if(isset($this->skinFetchInFlight[$definition->getId()]) || $definition->getSkinUrl() === ""){
+			return;
+		}
+		if($this->plugin->getConfig()->getNested("skin-url.enabled", true) !== true){
+			return;
+		}
+		$rawHosts = $this->plugin->getConfig()->getNested("skin-url.allowed-hosts", []);
+		$allowedHosts = [];
+		if(is_array($rawHosts)){
+			foreach($rawHosts as $host){
+				if(is_string($host) && trim($host) !== ""){
+					$allowedHosts[] = strtolower(trim($host));
+				}
+			}
+		}
+		$maxBytes = $this->plugin->getConfig()->getNested("skin-url.max-bytes", 1048576);
+		$timeout = $this->plugin->getConfig()->getNested("skin-url.timeout-seconds", 8);
+		if(!is_int($maxBytes) || $maxBytes < 1 || !is_int($timeout) || $timeout < 1){
+			return;
+		}
+		$this->skinFetchInFlight[$definition->getId()] = true;
+		$this->plugin->getServer()->getAsyncPool()->submitTask(new SkinFetchTask(
+			$this->plugin->getName(),
+			$definition->getId(),
+			$definition->getSkinUrl(),
+			$allowedHosts,
+			min($maxBytes, 8 * 1024 * 1024),
+			min($timeout, 30)
+		));
+	}
+
+	/** @param array<string, mixed> $result */
+	public function completeSkinFetch(string $id, array $result) : void{
+		unset($this->skinFetchInFlight[$id]);
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || ($result["ok"] ?? false) !== true || !is_string($result["data"] ?? null)){
+			if($definition !== null){
+				$this->plugin->getLogger()->warning("NPC '$id' skin URL could not be loaded: " . (is_string($result["error"] ?? null) ? $result["error"] : "unknown error"));
+			}
+			return;
+		}
+		$data = $result["data"];
+		if(!in_array(strlen($data), Skin::ACCEPTED_SKIN_SIZES, true)){
+			return;
+		}
+		$directory = $this->plugin->getDataFolder() . "skins";
+		if(!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)){
+			return;
+		}
+		$file = $id . ".url.rgba";
+		if(file_put_contents($directory . DIRECTORY_SEPARATOR . $file, $data, LOCK_EX) === false){
+			return;
+		}
+		$definition->setSkinFile($file);
+		$this->save();
+		$this->respawn($id);
 	}
 
 	private function readSkinAsset(string $relativePath, int $maxBytes) : string{
@@ -1026,9 +1313,115 @@ final class NpcManager{
 		}
 	}
 
-	private function rotateTowardsNearestPlayer(NpcEntity|MobNpcEntity $entity) : void{
+	private function parseBlock(string $blockId) : ?Block{
+		$blockId = trim($blockId);
+		if($blockId === ""){
+			return null;
+		}
+		$item = StringToItemParser::getInstance()->parse($blockId);
+		return $item?->getBlock();
+	}
+
+	private function canFly(string $entityType) : bool{
+		return in_array($entityType, ["allay", "bat", "bee", "blaze", "ender_dragon", "ghast", "happy_ghast", "phantom", "vex"], true);
+	}
+
+	private function tickWalking(NpcDefinition $definition, NpcEntity|MobNpcEntity|BlockNpcEntity $entity) : void{
+		$path = $definition->getWalkPath();
+		if(count($path) < 1){
+			return;
+		}
+		$index = $this->walkIndices[$definition->getId()] ?? 0;
+		$index = min($index, count($path) - 1);
+		$target = $path[$index];
+		if($target["world"] !== $entity->getWorld()->getFolderName()){
+			return;
+		}
+		$position = $entity->getPosition();
+		$dx = $target["x"] - $position->x;
+		$dy = $target["y"] - $position->y;
+		$dz = $target["z"] - $position->z;
+		$distance = sqrt(($dx * $dx) + ($dy * $dy) + ($dz * $dz));
+		if($distance <= max(0.05, $definition->getWalkSpeed() * 2.0)){
+			++$index;
+			if($index >= count($path)){
+				if(!$definition->isWalkLoop()){
+					$index = count($path) - 1;
+					$this->walkIndices[$definition->getId()] = $index;
+					return;
+				}
+				$index = 0;
+			}
+			$this->walkIndices[$definition->getId()] = $index;
+			return;
+		}
+		$step = min($definition->getWalkSpeed() * 2.0, $distance);
+		$entity->teleport($position->add($dx / $distance * $step, $dy / $distance * $step, $dz / $distance * $step), rad2deg(atan2(-$dx, $dz)), $target["pitch"]);
+	}
+
+	private function tickRandomEmote(NpcDefinition $definition, NpcEntity|MobNpcEntity|BlockNpcEntity $entity) : void{
+		if(!($entity instanceof NpcEntity)){
+			return;
+		}
+		$now = microtime(true);
+		$last = $this->lastRandomEmote[$definition->getId()] ?? 0.0;
+		if($now - $last < $definition->getRandomEmoteCooldown()){
+			return;
+		}
+		$pool = $definition->getEmotePool();
+		if($pool === []){
+			return;
+		}
+		$emote = $pool[array_rand($pool)];
+		$uuid = EmoteCatalog::resolve($emote);
+		if($uuid !== null){
+			$entity->emote($uuid);
+			$this->lastRandomEmote[$definition->getId()] = $now;
+		}
+	}
+
+	private function queryPlayerCount(NpcDefinition $definition) : void{
+		$key = strtolower($definition->getQueryHost() . ":" . $definition->getQueryPort());
+		if(isset($this->queryInFlight[$key])){
+			return;
+		}
+		$plugin = $this->plugin->getServer()->getPluginManager()->getPlugin("BedrockQuery");
+		$api = $plugin !== null ? $this->optionalObjectCall($plugin, "getApi", []) : null;
+		if($api === null || !is_callable([$api, "query"])){
+			$this->queryResults[$definition->getId()] = ["ok" => false, "players" => 0, "max" => 0, "status" => "BedrockQuery unavailable"];
+			return;
+		}
+		$this->queryInFlight[$key] = true;
+		$callback = function(mixed $result) use ($definition, $key) : void{
+			unset($this->queryInFlight[$key]);
+			if(!is_array($result) || ($result["ok"] ?? false) !== true || !is_array($result["data"] ?? null)){
+				$this->queryResults[$definition->getId()] = ["ok" => false, "players" => 0, "max" => 0, "status" => "offline"];
+				return;
+			}
+			$data = $result["data"];
+			$playersData = is_array($data["players"] ?? null) ? $data["players"] : [];
+			$players = $playersData["online"] ?? $data["Players"] ?? $data["online"] ?? $data["players"] ?? 0;
+			$max = $playersData["max"] ?? $data["MaxPlayers"] ?? $data["max_players"] ?? $data["max"] ?? 0;
+			$this->queryResults[$definition->getId()] = [
+				"ok" => true,
+				"players" => is_int($players) || is_float($players) || (is_string($players) && is_numeric($players)) ? (int) $players : 0,
+				"max" => is_int($max) || is_float($max) || (is_string($max) && is_numeric($max)) ? (int) $max : 0,
+				"status" => is_string($result["source"] ?? null) ? $result["source"] : "online"
+			];
+		};
+		try{
+			(\Closure::fromCallable([$api, "query"]))($definition->getQueryHost(), $definition->getQueryPort(), $callback);
+		}catch(\Throwable $error){
+			unset($this->queryInFlight[$key]);
+			$this->queryResults[$definition->getId()] = ["ok" => false, "players" => 0, "max" => 0, "status" => "query error"];
+			$this->plugin->getLogger()->debug("BedrockQuery integration failed: " . $error->getMessage());
+		}
+	}
+
+	private function rotateTowardsNearestPlayer(NpcEntity|MobNpcEntity|BlockNpcEntity $entity) : void{
 		$nearest = null;
-		$nearestDistance = 16.0 * 16.0;
+		$definition = $this->definitions[$entity->getNpcId()] ?? null;
+		$nearestDistance = ($definition?->getRotationDistance() ?? 16.0) ** 2;
 		foreach($entity->getWorld()->getPlayers() as $player){
 			$distance = $player->getPosition()->distanceSquared($entity->getPosition());
 			if($distance < $nearestDistance){

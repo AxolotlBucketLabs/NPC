@@ -6,6 +6,7 @@ namespace NhanAZ\NPC\ui;
 
 use NhanAZ\NPC\manager\NpcManager;
 use NhanAZ\NPC\model\EmoteCatalog;
+use NhanAZ\NPC\model\VanillaMobCatalog;
 use dktapps\pmforms\CustomForm;
 use dktapps\pmforms\CustomFormResponse;
 use dktapps\pmforms\FormIcon;
@@ -51,20 +52,29 @@ final class NpcUiManager{
 		));
 	}
 
+	/** Opens the same editor used by the list, for the sneak-right-click editor. */
+	public function openEditor(Player $player, string $id) : void{
+		$this->openEdit($player, $id);
+	}
+
 	private function openCreate(Player $player) : void{
 		$player->sendForm(new CustomForm(
 			"Create NPC",
 			[
 				new Input("id", "Stable NPC ID", "welcome"),
 				new Input("name", "Nametag", "Welcome NPC"),
-				new Dropdown("type", "Entity type", ["Human", "Bee"])
+				new Input("type", "Entity type", "human, bee, zombie...", "human")
 			],
 			function(Player $player, CustomFormResponse $response) : void{
 				$id = trim($response->getString("id"));
 				$name = trim($response->getString("name"));
-				$type = $response->getInt("type") === 1 ? "bee" : "human";
+				$type = strtolower(trim($response->getString("type")));
 				if($id === ""){
 					$player->sendMessage(TextFormat::RED . "NPC ID cannot be empty.");
+					return;
+				}
+				if(VanillaMobCatalog::resolve($type) === null){
+					$player->sendMessage(TextFormat::RED . "Unknown entity type. Use /npc entities in chat.");
 					return;
 				}
 				try{
@@ -137,7 +147,6 @@ final class NpcUiManager{
 		if($definition === null){
 			return;
 		}
-		$typeOptions = ["Human", "Bee"];
 		$actorAnimationOptions = ["None", "Fly (Bee: wing/flight)", "Arm swing", "Hurt", "Critical hit", "Magic critical"];
 		$actorAnimationTypes = ["none", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"];
 		$currentAnimationType = $definition->getAnimationType();
@@ -147,12 +156,16 @@ final class NpcUiManager{
 			"Basic NPC: " . $id,
 			[
 				new Input("name", "Nametag line 1", "NPC", $definition->getLines()[0] ?? "NPC"),
-				new Dropdown("type", "Entity type", $typeOptions, $definition->getEntityType() === "bee" ? 1 : 0),
+				new Input("type", "Entity type", "human, bee, zombie...", $definition->getEntityType()),
 				new Input("skin", "Skin file, player, clear or empty", "skin.rgba", $definition->getSkinFile()),
+				new Input("skin_url", "HTTPS skin URL (allowlisted host)", "https://textures.minecraft.net/...", $definition->getSkinUrl()),
 				new Input("menu", "Player-list menu name", "Optional", $definition->getMenuName()),
 				new Input("cooldown", "Cooldown seconds", "0", (string) $definition->getCooldown()),
 				new Input("scale", "Scale", "1", (string) $definition->getScale()),
+				new Toggle("nametag", "Show nametag", $definition->isNametagVisible()),
 				new Toggle("rotate", "Look at nearby players", $definition->isRotateEnabled()),
+				new Input("rotation_distance", "Rotation distance (blocks)", "16", (string) $definition->getRotationDistance()),
+				new Input("interaction_mode", "Interaction mode: shared or separate", "shared", $definition->getInteractionMode()),
 				new Toggle("particle", "Show particles", $definition->isParticleEnabled()),
 				new Toggle("sound", "Play hit sound", $definition->isSoundEnabled()),
 				new Input("particle_type", "Particle type", "flame", $definition->getParticleType()),
@@ -160,7 +173,15 @@ final class NpcUiManager{
 				new Dropdown("actor_animation", "Actor animation (Bee fly is not a player emote)", $actorAnimationOptions, max(0, array_search(in_array($currentAnimationType, $actorAnimationTypes, true) ? $currentAnimationType : "none", $actorAnimationTypes, true))),
 				new Input("emote_id", "Player emote name or UUID (blank disables)", "wave", $currentAnimationType === "emote" ? $definition->getAnimationId() : ""),
 				new Input("animation_interval", "Animation interval in ticks", "100", (string) $definition->getAnimationInterval()),
-				new Dropdown("animation_trigger", "Animation trigger", $triggers, max(0, array_search($definition->getAnimationTrigger(), $triggerValues, true)))
+				new Dropdown("animation_trigger", "Animation trigger", $triggers, max(0, array_search($definition->getAnimationTrigger(), $triggerValues, true))),
+				new Input("player_count_mode", "Player count: none/server/world/query", "server", $definition->getPlayerCountMode()),
+				new Input("player_count_target", "World name or query host", "", $definition->getPlayerCountMode() === "world" ? $definition->getPlayerCountWorld() : $definition->getQueryHost()),
+				new Input("query_port", "Query port", "19132", (string) $definition->getQueryPort()),
+				new Toggle("walk", "Enable walking path (off by default)", $definition->isWalkEnabled()),
+				new Input("walk_speed", "Walk speed", "0.06", (string) $definition->getWalkSpeed()),
+				new Toggle("random_emote", "Enable random emote (off by default)", $definition->isRandomEmoteEnabled()),
+				new Input("random_emote_pool", "Random emote names/UUIDs, comma separated", "wave, simple clap", implode(", ", $definition->getEmotePool())),
+				new Input("random_emote_cooldown", "Random emote cooldown seconds", "60", (string) $definition->getRandomEmoteCooldown())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id, $actorAnimationTypes, $triggerValues) : void{
 				$emote = trim($response->getString("emote_id"));
@@ -172,17 +193,26 @@ final class NpcUiManager{
 				if($name !== ""){
 					$this->manager->setLines($id, 1, $name);
 				}
-				$this->manager->setEntityType($id, $response->getInt("type") === 1 ? "bee" : "human");
+				$this->manager->setEntityType($id, trim($response->getString("type")));
 				$skin = trim($response->getString("skin"));
 				if($skin === "player"){
 					$this->manager->setSkinFromPlayer($player, $id);
 				}elseif($skin !== ""){
 					$this->manager->setSkinFile($id, strtolower($skin) === "clear" ? "" : $skin);
 				}
+				$skinUrl = trim($response->getString("skin_url"));
+				if($skinUrl !== ""){
+					$this->manager->setSkinUrl($id, strtolower($skinUrl) === "clear" ? "" : $skinUrl);
+				}
 				$this->manager->setMenuName($id, $response->getString("menu"));
 				$this->manager->setCooldown($id, is_numeric($response->getString("cooldown")) ? (float) $response->getString("cooldown") : 0.0);
 				$this->manager->setScale($id, is_numeric($response->getString("scale")) ? (float) $response->getString("scale") : 1.0);
+				$this->manager->setNametagVisible($id, $response->getBool("nametag"));
 				$this->manager->setBoolean($id, "rotate", $response->getBool("rotate"));
+				if(is_numeric($response->getString("rotation_distance"))){
+					$this->manager->setRotationDistance($id, (float) $response->getString("rotation_distance"));
+				}
+				$this->manager->setInteractionMode($id, strtolower(trim($response->getString("interaction_mode"))));
 				$this->manager->setBoolean($id, "particle", $response->getBool("particle"));
 				$this->manager->setBoolean($id, "sound", $response->getBool("sound"));
 				$this->manager->setEffectType($id, "particle", $response->getString("particle_type"));
@@ -195,6 +225,15 @@ final class NpcUiManager{
 					is_numeric($response->getString("animation_interval")) ? (int) $response->getString("animation_interval") : 100,
 					$triggerValues[$response->getInt("animation_trigger")] ?? "timer"
 				);
+				$mode = strtolower(trim($response->getString("player_count_mode")));
+				$target = trim($response->getString("player_count_target"));
+				$this->manager->setPlayerCount($id, $mode, $mode === "world" ? $target : "", $mode === "query" ? $target : "", is_numeric($response->getString("query_port")) ? (int) $response->getString("query_port") : 19132);
+				$this->manager->setBoolean($id, "walk", $response->getBool("walk"));
+				if(is_numeric($response->getString("walk_speed"))){
+					$this->manager->setWalkSpeed($id, (float) $response->getString("walk_speed"));
+				}
+				$pool = array_values(array_filter(array_map("trim", explode(",", $response->getString("random_emote_pool"))), static fn(string $value) : bool => $value !== ""));
+				$this->manager->setEmotePool($id, $pool, $response->getBool("random_emote"), is_numeric($response->getString("random_emote_cooldown")) ? (float) $response->getString("random_emote_cooldown") : 60.0);
 				$player->sendMessage(TextFormat::GREEN . "NPC '$id' updated.");
 				$this->openEdit($player, $id);
 			},

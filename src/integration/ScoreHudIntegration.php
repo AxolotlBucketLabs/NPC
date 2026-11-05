@@ -22,6 +22,8 @@ final class ScoreHudIntegration{
 	private const TAGS = [
 		"npc.count",
 		"npc.ids",
+		"npc.server_players",
+		"npc.world_players",
 		"npc.nearest_id",
 		"npc.nearest_name",
 		"npc.nearest_distance",

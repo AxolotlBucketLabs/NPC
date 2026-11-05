@@ -28,6 +28,12 @@ The first deployable milestone includes:
 - edit aliases for names, commands, hand/armor equipment, scale, reload, and teleporting an NPC or player;
 - `/npc ui`, a PMForms-backed operator GUI for creating, editing, importing and deleting NPCs;
 - Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click event triggers;
+- every current Vanilla Bedrock mob network type from Axolotl-PM's entity catalog, plus passive `falling_block`/FallingSand actors;
+- a safe custom visual-entity registry through `Main::registerEntityType()` without arbitrary PHP class loading;
+- shared interaction actions by default, with opt-in `separate` hit/interact actions and `message:` direct messages;
+- optional walking paths (off by default), configurable nametag visibility, rotation distance, and asynchronous allowlisted HTTPS skin URLs;
+- random player-emote pools (off by default) and a right-click sneak editor that opens the same PMForms editor as `/npc ui`;
+- server-local and per-world player counts, plus optional remote Bedrock counts through the renamed `BedrockQuery` plugin;
 - the bundled Bedrock Marketplace emote catalog (2,000+ title/UUID entries), including `wave`, `simple_clap`, `over_there`, `bow`, and many more, plus arbitrary valid Bedrock emote IDs;
 - actor animations (`fly` for the Bee wing/flight state, plus `arm_swing`, `hurt`, `critical_hit`, and `magic_critical`) kept separate from player emotes;
 - optional ScoreHud integration with live `npc.*` tags;
@@ -43,25 +49,37 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc remove <id>
 /npc setname <id> <name>
 /npc setline <id> <line> <text>
-/npc addcommand <id> <command|console:command>
+/npc addcommand <id> <command|console:command|message:text>
+/npc hitcommand <id> <action>
+/npc interactcommand <id> <action>
+/npc interaction-mode <id> <shared|separate>
 /npc clearcommands <id>
 /npc equipment <id> <hand|helmet|chestplate|leggings|boots> <item|clear>
 /npc skin <id> <relative-raw-skin-file|player|clear>
+/npc skin-url <id> <https-url|clear>
 /npc cooldown <id> <seconds>
 /npc scale <id> <size>
 /npc particle-type <id> <type>
 /npc sound-type <id> <type>
 /npc menuname <id> <name|remove>
-/npc type <id> <human|bee>
+/npc type <id> <human|any-vanilla-mob|falling_block>
 /npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]
 /npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]
 /npc emotes [search]
+/npc random-emote <id> <on|off> [seconds] [emote...]
+/npc namevisible <id> <on|off>
+/npc rotation-distance <id> <blocks>
+/npc playercount <id> <none|server|world|query> [world|host] [port]
+/npc block <id> <block-id|clear>
+/npc walk <id> <on|off|add|clear> [speed]
 /npc ui
 /npc rotate <id> <on|off>
 /npc particle <id> <on|off>
 /npc sound <id> <on|off>
 /npc tp <id>
 /npc list
+/npc entities
+/npc updateall
 /npc debug
 /npc id
 /npc cancel
@@ -86,7 +104,10 @@ npcs:
       - "&7Online: &f{online}"
     commands:
       - "console: say {player} clicked welcome"
-      - "spawn"
+      - "message:&aWelcome, {player}!"
+    interaction-mode: shared
+    hit-commands: []
+    interact-commands: []
     cooldown: 2
     rotate: true
     particle: false
@@ -97,19 +118,33 @@ npcs:
     equipment:
       hand: iron_sword
       helmet: iron_helmet
+    nametag-visible: true
+    rotation-distance: 16
+    player-count-mode: server
+    player-count-world: ""
+    query-host: ""
+    query-port: 19132
+    query-interval: 200
+    walk-enabled: false
+    walk-speed: 0.06
+    walk-loop: true
+    walk-path: []
+    random-emote-enabled: false
+    random-emote-cooldown: 60
+    emote-pool: [wave, simple_clap]
 ```
 
-Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, or 128x128 RGBA file under `plugin_data/NPC/skins/`, then run `/npc skin <id> <relative-file>`. From in-game, `/npc skin <id> player` (or the old `/slapper edit <id> skin`) copies the executing player's validated skin, cape, and geometry into that local directory. Cape files must be exactly 8192 bytes and can be set in YAML with the `cape` field. The plugin does not download or follow skin URLs.
+Raw skins remain local and are still the most deterministic option. Place a 64x32, 64x64, or 128x128 RGBA file under `plugin_data/NPC/skins/`, then run `/npc skin <id> <relative-file>`. From in-game, `/npc skin <id> player` copies the executing player's validated skin, cape, and geometry into that local directory. Direct PNG/RGBA skin URLs are supported through `/npc skin-url`, but only HTTPS hosts listed exactly under `skin-url.allowed-hosts` in `config.yml` are fetched. Fetching is asynchronous, redirects are disabled, private/reserved DNS addresses are rejected, and the response is size/time limited. Cape files must be exactly 8192 bytes and can be set in YAML with the `cape` field.
 
 ## Operator UI
 
-`/npc ui` opens the operator menu built with the `pmforms` virion. The menu can create an NPC, edit its name/type/skin/effects/animation, browse the emote catalog, select an emote from an image-backed paginated menu, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. Emote result buttons show the official 128x128 thumbnail from the Bedrock-Emotes image repository; only the URL is sent in the form, so the PNGs are not copied into `NPC.phar`. DevTools prepares PMForms from the pinned `NhanAZ-Libraries/pmforms` Composer source and packages it into `NPC.phar`; a separate forms plugin is not required at runtime.
+`/npc ui` opens the operator menu built with the `pmforms` virion. The menu can create an NPC, edit its name/type/skin/effects/animation, browse the emote catalog, select an emote from an image-backed paginated menu, configure player counts/walking/random emotes, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. Sneak-right-clicking an NPC as an operator opens its editor directly. Emote result buttons show the official 128x128 thumbnail from the Bedrock-Emotes image repository; only the URL is sent in the form, so the PNGs are not copied into `NPC.phar`. DevTools prepares PMForms from the pinned `NhanAZ-Libraries/pmforms` Composer source and packages it into `NPC.phar`; a separate forms plugin is not required at runtime.
 
 The GUI is permission-gated by `npc.admin`. It is a control surface for trusted operators, not a player-facing NPC interaction menu.
 
 ## Entity types, emotes and animations
 
-Human is the default and supports local skins, cape/geometry data, equipment, player-list menu names, and player emotes. `bee` is a lightweight visual mob actor using the Bedrock `minecraft:bee` network identifier. It is not a full Bee AI implementation: it does not pathfind, pollinate, or persist as a world entity. Skins and equipment are disabled for Bee definitions. With `animation-type: fly`, the plugin moves the actor through a small passive hover/orbit and advertises the Bedrock flying metadata flag; this is visual movement, not native Bee AI.
+Human is the default and supports local/remote skins, cape/geometry data, equipment, player-list menu names, and player emotes. Every Vanilla mob in the current Bedrock entity ID table is available as a passive visual actor (`zombie`, `allay`, `camel`, `warden`, `happy_ghast`, and so on); `/npc entities` prints the exact catalog. These are visual actors, not native mob AI: they do not pathfind, attack, breed, drop loot, or persist as world entities. `falling_block` is a passive block actor and reads its visual from `block-id: stone` (or any valid PocketMine item/block alias). Skins/equipment/player-list menu names apply only to Human actors. `animation-type: fly` remains a visual hover/orbit state for the flying display types, not native AI.
 
 Player emotes, actor animations, and particles are separate controls:
 
@@ -133,7 +168,7 @@ The bundled name catalog is generated from [TwistedAsylumMC/Bedrock-Emotes](http
 
 Use `timer` for a repeating emote or actor animation, `spawn` for one event when the NPC is spawned, or `right_click`/`left_click` for interaction-triggered events. Client support for a particular emote is controlled by the Bedrock client; the packet is sent only for the selected Human NPC. Bee motion is updated continuously and does not use an emote packet.
 
-Player-specific integration placeholders are expanded for click actions. Nametags remain shared entity metadata, so `{online}` and `{players}` are suitable for persistent nametags while `{rank}` and `{balance}` are intended for action commands unless a future per-viewer nametag layer is enabled.
+Player-specific integration placeholders are expanded for click actions. Nametags are shared entity metadata, so `{rank}` and `{balance}` are intended for action commands. Nametag player-count placeholders are definition-wide and safe for persistent display: `{online}`/`{server_players}` are server totals, `{world_players}` is the configured NPC world's local count, and `{player_count}` selects `server`, `world`, or remote `query`. Remote query values are also exposed as `{query_players}`, `{query_max}`, and `{query_status}`.
 
 Supported particle types are `flame`, `entity_flame`, `heart`, `critical`, `smoke`, `explode`, `portal`, `happy_villager`, `bubble`, `splash`, `water`, and `lava`. Supported hit sounds are `click`, `pop`, `door_bump`, `explode`, and `totem`. Unknown values fall back safely to the default effect instead of dynamically loading a class.
 
@@ -156,7 +191,7 @@ The `/slapper` command alias accepts the historical Human/Player workflow withou
 /slapper edit <id> menuname <name|remove>
 ```
 
-The compatibility layer deliberately reports unsupported historical entity types instead of pretending they are equivalent to a Human. `/npc id` (or `/slapper id`) waits for a hit and reports both the stable NPC ID and the current network entity ID. `/npc remove` without an ID waits for a hit and removes only the selected NPC definition; `/npc cancel` clears the pending session. Right-click and left-click both run the configured actions, subject to the same cooldown. `/npc menuname <id> <name|remove>` keeps a Human-style NPC in the Bedrock player list with the requested name and removes the row cleanly when disabled.
+The compatibility layer now accepts all catalogued visual types instead of silently coercing them to Human. `/npc id` (or `/slapper id`) waits for a hit and reports both the stable NPC ID and the current network entity ID. `/npc remove` without an ID waits for a hit and removes only the selected NPC definition; `/npc cancel` clears the pending session. Right-click and left-click both run the shared action list by default, preserving one behavior for users who do not want to distinguish them. Set `interaction-mode: separate` to add `interact-commands` and `hit-commands`; the shared list still runs first. `/npc menuname <id> <name|remove>` keeps a Human-style NPC in the Bedrock player list with the requested name and removes the row cleanly when disabled.
 
 When the old Slapper plugin is still installed and its entities are loaded, an operator can import the Human entities with:
 
@@ -170,7 +205,7 @@ The command copies location, nametag, commands, scale, hand/armor aliases, menu 
 
 The core deliberately has no hard dependency on PureChat, PurePerms, ScoreHud, EcoAPI, SimpleEconomy, TownCoins, or TownEconomy. This lets it load when those plugins are absent and avoids coupling NPC persistence to another plugin's storage format.
 
-The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter.
+The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. `BedrockQuery` is optional; install the renamed library from [NhanAZ-Libraries/BedrockQuery](https://github.com/NhanAZ-Libraries/BedrockQuery). When it is installed, `player-count-mode: query` calls its asynchronous API and does not make NPC load failure depend on that plugin. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter.
 
 ## ScoreHud integration
 
@@ -187,6 +222,8 @@ ScoreHud is optional and is detected at runtime. When present, NPC refreshes the
 {npc.nearest_animation}
 {npc.nearest_emote}
 {npc.nearest_motion}
+{npc.server_players}
+{npc.world_players}
 ```
 
 The tags are resolved in the viewer's current world. `npc.nearest_animation` contains the actor animation/state (`fly`, `arm_swing`, `hurt`, `critical_hit`, `magic_critical`) or `none`; `npc.nearest_emote` contains the configured friendly emote name/UUID or an empty string; and `npc.nearest_motion` remains a convenience value containing `fly` or `none`. `npc.nearest_*` values refer to the closest currently spawned NPC, while `npc.count` and `npc.ids` include only NPCs visible in that world. The integration uses ScoreHud's event API and does not require ScoreHud to be installed for NPC to load.

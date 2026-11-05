@@ -3,3 +3,11 @@ settings:
   default-cooldown: 0
   rotate-interval-ticks: 10
   particle-interval-ticks: 10
+skin-url:
+  enabled: true
+  # Exact HTTPS host allowlist. Add your own CDN explicitly before using it.
+  allowed-hosts:
+    - textures.minecraft.net
+    - raw.githubusercontent.com
+  max-bytes: 1048576
+  timeout-seconds: 8

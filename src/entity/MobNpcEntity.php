@@ -14,8 +14,14 @@ use pocketmine\entity\animation\CriticalHitAnimation;
 use pocketmine\entity\animation\HurtAnimation;
 use pocketmine\entity\animation\MagicHitAnimation;
 use pocketmine\entity\Location;
+use pocketmine\network\mcpe\protocol\AddActorPacket;
+use pocketmine\network\mcpe\protocol\types\entity\Attribute as NetworkAttribute;
 use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataCollection;
 use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataFlags;
+use pocketmine\network\mcpe\protocol\types\entity\PropertySyncData;
+use pocketmine\player\Player;
+use function array_map;
+use function array_values;
 
 /**
  * A lightweight visual mob actor. It deliberately has no mob AI or drops: NPC
@@ -31,7 +37,7 @@ final class MobNpcEntity extends Living implements NeverSavedWithChunkEntity{
 	private float $flightOriginZ = 0.0;
 	private float $flightPhase;
 
-	public function __construct(Location $location, private string $npcId, private string $networkTypeId){
+	public function __construct(Location $location, private string $npcId, private string $networkTypeId, private bool $canFly = false){
 		parent::__construct($location);
 		$this->setCanSaveWithChunk(false);
 		$this->setNoClientPredictions(true);
@@ -61,7 +67,32 @@ final class MobNpcEntity extends Living implements NeverSavedWithChunkEntity{
 
 	protected function syncNetworkData(EntityMetadataCollection $properties) : void{
 		parent::syncNetworkData($properties);
-		$properties->setGenericFlag(EntityMetadataFlags::CAN_FLY, true);
+		$properties->setGenericFlag(EntityMetadataFlags::CAN_FLY, $this->canFly);
+	}
+
+	/** Uses the definition's network ID instead of the static fallback required by Entity. */
+	protected function sendSpawnPacket(Player $player) : void{
+		$player->getNetworkSession()->sendDataPacket(AddActorPacket::create(
+			$this->getId(),
+			$this->getId(),
+			$this->networkTypeId,
+			$this->getOffsetPosition($this->getLocation()->asVector3()),
+			$this->getMotion(),
+			$this->getLocation()->pitch,
+			$this->getLocation()->yaw,
+			$this->getLocation()->yaw,
+			$this->getLocation()->yaw,
+			array_map(static fn(\pocketmine\entity\Attribute $attribute) : NetworkAttribute => new NetworkAttribute(
+				$attribute->getId(),
+				$attribute->getMinValue(),
+				$attribute->getMaxValue(),
+				$attribute->getValue()
+			), array_values($this->attributeMap->getAll())),
+			$this->getAllNetworkData(),
+			new PropertySyncData([], []),
+			[],
+			null
+		));
 	}
 
 	/**
