@@ -25,6 +25,9 @@ final class VanillaMobCatalog{
 	/** @var array<string, string> canonical type => Bedrock network identifier */
 	private static array $types = [
 		"falling_block" => "minecraft:falling_block",
+		"boat" => "minecraft:boat",
+		"minecart" => "minecraft:minecart",
+		"primed_tnt" => "minecraft:tnt",
 		"allay" => "minecraft:allay",
 		"armadillo" => "minecraft:armadillo",
 		"axolotl" => "minecraft:axolotl",
@@ -121,6 +124,9 @@ final class VanillaMobCatalog{
 		"human" => "human",
 		"player" => "human",
 		"npc" => "human",
+		"mine_cart" => "minecart",
+		"tnt" => "primed_tnt",
+		"primedtnt" => "primed_tnt",
 		"magmacube" => "magma_cube",
 		"magma-cube" => "magma_cube",
 		"mooshroom" => "mooshroom",
@@ -196,6 +202,9 @@ final class VanillaMobCatalog{
 		$type = self::resolve($type) ?? "";
 		return match($type){
 			"falling_block" => "textures/blocks/stone",
+			"boat" => "textures/items/boat/boat_oak",
+			"minecart" => "textures/items/minecart",
+			"primed_tnt" => "textures/blocks/tnt_side",
 			"human" => "textures/items/egg_npc",
 			"evocation_illager" => "textures/items/spawn_eggs/spawn_egg_evoker",
 			"villager_v2" => "textures/items/spawn_eggs/spawn_egg_villager",

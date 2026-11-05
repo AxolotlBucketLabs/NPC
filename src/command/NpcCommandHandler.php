@@ -53,6 +53,20 @@ final class NpcCommandHandler{
 			$sender->sendMessage(TextFormat::RED . "You do not have permission to edit NPCs.");
 			return true;
 		}
+		// Slapper users commonly copy the numeric entity ID shown by /npc id.
+		// Normalize it to the persistent definition ID before dispatching any
+		// ID-first command, while retaining the original error for stale IDs.
+		$idFirstCommands = [
+			"edit", "remove", "delete", "setname", "setline", "addcommand", "clearcommands",
+			"equipment", "skin", "skin-url", "cooldown", "scale", "particle-type", "sound-type",
+			"hitsound", "menuname", "menu-name", "type", "entity-type", "animation", "emote",
+			"hitcommand", "interactcommand", "interaction-mode", "rotation-distance", "playercount",
+			"block", "walk", "random-emote", "rotate", "particle", "sound", "namevisible",
+			"namevisibility", "customnamevisible", "tagvisible", "tp"
+		];
+		if(in_array($subcommand, $idFirstCommands, true) && isset($args[0])){
+			$args[0] = $this->manager->resolveId((string) $args[0]) ?? (string) $args[0];
+		}
 
 		switch($subcommand){
 			case "id": return $this->idSession($sender);
@@ -91,7 +105,9 @@ final class NpcCommandHandler{
 			case "block": return $this->block($sender, $args);
 			case "walk": return $this->walk($sender, $args);
 			case "random-emote": return $this->randomEmote($sender, $args);
-			case "rotate": case "particle": case "sound": case "namevisible": return $this->toggle($sender, $subcommand === "namevisible" ? "nametag" : $subcommand, $args);
+			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
+			case "namevisible": return $this->toggle($sender, "nametag", $args);
+			case "namevisibility": case "customnamevisible": case "tagvisible": return $this->nameVisibility($sender, $args);
 			case "tp": return $this->teleport($sender, $args);
 			case "reload": $this->manager->reload(); $sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded."); return true;
 			case "debug": return $this->debug($sender);
@@ -143,16 +159,16 @@ final class NpcCommandHandler{
 			"/npc particle-type <id> <flame|heart|smoke|...>",
 			"/npc sound-type <id> <click|pop|door_bump|...>",
 			"/npc menuname <id> <name|remove>",
-			"/npc type <id> <human|any Vanilla mob|falling_block>",
+			"/npc type <id> <human|any Vanilla mob|boat|minecart|primed_tnt|falling_block>",
 			"/npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]",
 			"/npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]",
 			"/npc emotes [search]",
 			"/npc random-emote <id> <on|off> [seconds] [emote... ]",
 			"/npc interaction-mode <id> <shared|separate>",
-			"/npc namevisible <id> <on|off>",
+			"/npc namevisibility <id> <never|hover|always> (namevisible on/off is legacy-compatible)",
 			"/npc rotation-distance <id> <blocks>",
 			"/npc playercount <id> <none|server|world|query> [world|host] [port]",
-			"/npc block <id> <block-id|clear> (use type falling_block)",
+			"/npc block <id> <block-name|legacy-id:meta|clear> (prefer stone or minecraft:stone)",
 			"/npc walk <id> <on|off|add|clear> [speed]",
 			"/npc ui",
 			"/npc rotate|particle|sound <id> <on|off>",
@@ -253,6 +269,8 @@ final class NpcCommandHandler{
 				return $this->skin($sender, [$id, ...$args]);
 			case "menuname": case "menu-name":
 				return $this->menuName($sender, [$id, ...$args]);
+			case "namevisibility":
+				return $this->nameVisibility($sender, [$id, ...$args]);
 			case "namevisible": case "customnamevisible": case "tagvisible":
 				return $this->toggle($sender, "nametag", [$id, ...$args]);
 			default:
@@ -701,6 +719,24 @@ final class NpcCommandHandler{
 		}
 		$ok = $this->manager->setEmotePool($id, $pool, $state === "on", $cooldown !== null && is_numeric($cooldown) ? (float) $cooldown : $definition->getRandomEmoteCooldown());
 		$sender->sendMessage($ok ? TextFormat::GREEN . "Random emote mode updated." : TextFormat::RED . "NPC is not a Human or was not found.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function nameVisibility(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$value = strtolower(str_replace("-", "_", array_shift($args) ?? ""));
+		if($id === null || $value === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc namevisibility <id> <never|hover|always> (namevisible on/off remains supported)");
+			return true;
+		}
+		if(in_array($value, ["on", "true", "1"], true)){
+			$value = "always";
+		}elseif(in_array($value, ["off", "false", "0"], true)){
+			$value = "never";
+		}
+		$ok = $this->manager->setNametagVisibility($id, $value);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC nametag visibility updated to $value." : TextFormat::YELLOW . "/npc namevisibility <id> <never|hover|always>");
 		return true;
 	}
 

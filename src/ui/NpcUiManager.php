@@ -263,6 +263,7 @@ final class NpcUiManager{
 		$actorAnimationOptions = ["None", "Fly (Bee: wing/flight)", "Arm swing", "Hurt", "Critical hit", "Magic critical"];
 		$actorAnimationTypes = ["none", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"];
 		$currentAnimationType = $definition->getAnimationType();
+		$nametagVisibilityValues = ["never", "hover", "always"];
 		$triggers = ["Timer", "Spawn", "Right click", "Left click"];
 		$triggerValues = ["timer", "spawn", "right_click", "left_click"];
 		$player->sendForm(new CustomForm(
@@ -275,7 +276,7 @@ final class NpcUiManager{
 				new Input("menu", "Player-list menu name", "Optional", $definition->getMenuName()),
 				new Input("cooldown", "Cooldown seconds", "0", (string) $definition->getCooldown()),
 				new Input("scale", "Scale", "1", (string) $definition->getScale()),
-				new Toggle("nametag", "Show nametag", $definition->isNametagVisible()),
+				new Dropdown("nametag_visibility", "Nametag visibility", ["Never", "Hover", "Always"], max(0, array_search($definition->getNametagVisibility(), $nametagVisibilityValues, true))),
 				new Toggle("rotate", "Look at nearby players", $definition->isRotateEnabled()),
 				new Input("rotation_distance", "Rotation distance (blocks)", "16", (string) $definition->getRotationDistance()),
 				new Input("interaction_mode", "Interaction mode: shared or separate", "shared", $definition->getInteractionMode()),
@@ -296,7 +297,7 @@ final class NpcUiManager{
 				new Input("random_emote_pool", "Random emote names/UUIDs, comma separated", "wave, simple clap", implode(", ", $definition->getEmotePool())),
 				new Input("random_emote_cooldown", "Random emote cooldown seconds", "60", (string) $definition->getRandomEmoteCooldown())
 			],
-			function(Player $player, CustomFormResponse $response) use ($id, $actorAnimationTypes, $triggerValues) : void{
+			function(Player $player, CustomFormResponse $response) use ($id, $actorAnimationTypes, $triggerValues, $nametagVisibilityValues) : void{
 				$emote = trim($response->getString("emote_id"));
 				if($emote !== "" && EmoteCatalog::resolve($emote) === null){
 					$player->sendMessage(TextFormat::RED . "Unknown emote. Use a supported alias or a valid Bedrock emote UUID.");
@@ -320,7 +321,7 @@ final class NpcUiManager{
 				$this->manager->setMenuName($id, $response->getString("menu"));
 				$this->manager->setCooldown($id, is_numeric($response->getString("cooldown")) ? (float) $response->getString("cooldown") : 0.0);
 				$this->manager->setScale($id, is_numeric($response->getString("scale")) ? (float) $response->getString("scale") : 1.0);
-				$this->manager->setNametagVisible($id, $response->getBool("nametag"));
+				$this->manager->setNametagVisibility($id, $nametagVisibilityValues[$response->getInt("nametag_visibility")] ?? "always");
 				$this->manager->setBoolean($id, "rotate", $response->getBool("rotate"));
 				if(is_numeric($response->getString("rotation_distance"))){
 					$this->manager->setRotationDistance($id, (float) $response->getString("rotation_distance"));

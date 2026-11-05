@@ -7,6 +7,7 @@ namespace NhanAZ\NPC\manager;
 use NhanAZ\NPC\entity\NpcEntity;
 use NhanAZ\NPC\entity\MobNpcEntity;
 use NhanAZ\NPC\entity\BlockNpcEntity;
+use NhanAZ\NPC\entity\ActorNpcEntity;
 use NhanAZ\NPC\model\EmoteCatalog;
 use NhanAZ\NPC\model\NpcDefinition;
 use NhanAZ\NPC\model\VanillaMobCatalog;
@@ -24,6 +25,7 @@ use pocketmine\entity\animation\HurtAnimation;
 use pocketmine\entity\animation\MagicHitAnimation;
 use pocketmine\event\player\PlayerEntityInteractEvent;
 use pocketmine\item\StringToItemParser;
+use pocketmine\item\LegacyStringToItemParser;
 use pocketmine\player\Player;
 use pocketmine\utils\Config;
 use pocketmine\utils\TextFormat;
@@ -61,6 +63,7 @@ use function json_encode;
 use function mt_rand;
 use function random_int;
 use function count;
+use function ctype_digit;
 use function deg2rad;
 use function file_get_contents;
 use function file_put_contents;
@@ -88,7 +91,7 @@ final class NpcManager{
 	/** @var array<string, NpcDefinition> */
 	private array $definitions = [];
 
-	/** @var array<string, NpcEntity|MobNpcEntity|BlockNpcEntity> */
+	/** @var array<string, NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity> */
 	private array $entities = [];
 
 	/** @var array<string, array<string, float>> */
@@ -220,7 +223,7 @@ final class NpcManager{
 				continue;
 			}
 			$entity->setNameTag($this->renderLines($definition));
-			$entity->setNameTagVisible($definition->isNametagVisible());
+			$this->applyNametagVisibility($entity, $definition);
 			if($definition->isRotateEnabled()){
 				$this->rotateTowardsNearestPlayer($entity);
 			}
@@ -232,6 +235,31 @@ final class NpcManager{
 
 	public function getDefinition(string $id) : ?NpcDefinition{
 		return $this->definitions[$id] ?? null;
+	}
+
+	/**
+	 * Resolves the persistent NPC ID or a currently spawned runtime entity ID.
+	 * Runtime IDs are deliberately accepted only for live NPC actors, so an old
+	 * or unrelated entity ID cannot accidentally edit a definition.
+	 */
+	public function resolveId(string $identifier) : ?string{
+		$identifier = trim($identifier);
+		if($identifier === ""){
+			return null;
+		}
+		if(isset($this->definitions[$identifier])){
+			return $identifier;
+		}
+		if(!ctype_digit($identifier)){
+			return null;
+		}
+		$runtimeId = (int) $identifier;
+		foreach($this->entities as $id => $entity){
+			if(!$entity->isClosed() && $entity->getId() === $runtimeId){
+				return $id;
+			}
+		}
+		return null;
 	}
 
 	/** @return array<string, NpcDefinition> */
@@ -275,8 +303,8 @@ final class NpcManager{
 		return $removed;
 	}
 
-	/** @return NpcEntity|MobNpcEntity|BlockNpcEntity|null */
-	public function spawn(NpcDefinition $definition) : NpcEntity|MobNpcEntity|BlockNpcEntity|null{
+	/** @return NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity|null */
+	public function spawn(NpcDefinition $definition) : NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity|null{
 		$world = $this->plugin->getServer()->getWorldManager()->getWorldByName($definition->getWorld());
 		if($world === null){
 			$this->plugin->getLogger()->warning("World '" . $definition->getWorld() . "' for NPC '" . $definition->getId() . "' is not loaded");
@@ -303,6 +331,17 @@ final class NpcManager{
 			}else{
 				$entity = new BlockNpcEntity($location, $definition->getId(), $block);
 			}
+		}elseif(in_array($entityType, ["boat", "minecart", "primed_tnt"], true)){
+			$networkId = VanillaMobCatalog::networkId($entityType);
+			if($networkId === null){
+				return null;
+			}
+			[$width, $height] = match($entityType){
+				"boat" => [1.4, 0.6],
+				"minecart" => [0.98, 0.7],
+				default => [0.98, 0.98]
+			};
+			$entity = new ActorNpcEntity($location, $definition->getId(), $networkId, $width, $height);
 		}elseif($entityType !== "human"){
 			$networkId = VanillaMobCatalog::networkId($entityType);
 			if($networkId === null){
@@ -317,8 +356,7 @@ final class NpcManager{
 			$this->applyEquipment($entity, $definition);
 		}
 		$entity->setNameTag($this->renderLines($definition));
-		$entity->setNameTagVisible($definition->isNametagVisible());
-		$entity->setNameTagAlwaysVisible(true);
+		$this->applyNametagVisibility($entity, $definition);
 		$this->entities[$definition->getId()] = $entity;
 		if($definition->getAnimationTrigger() === "spawn"){
 			$this->playAnimation($entity, $definition);
@@ -575,7 +613,24 @@ final class NpcManager{
 		}
 		$entity = $this->entities[$id] ?? null;
 		if($entity !== null && !$entity->isClosed()){
-			$entity->setNameTagVisible($visible);
+			$definition = $this->definitions[$id] ?? null;
+			if($definition !== null){
+				$this->applyNametagVisibility($entity, $definition);
+			}
+		}
+		return true;
+	}
+
+	public function setNametagVisibility(string $id, string $visibility) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !in_array(strtolower($visibility), ["never", "hover", "always"], true)){
+			return false;
+		}
+		$definition->setNametagVisibility($visibility);
+		$this->save();
+		$entity = $this->entities[$id] ?? null;
+		if($entity !== null && !$entity->isClosed()){
+			$this->applyNametagVisibility($entity, $definition);
 		}
 		return true;
 	}
@@ -803,14 +858,14 @@ final class NpcManager{
 
 	public function handleInteract(PlayerEntityInteractEvent $event) : void{
 		$entity = $event->getEntity();
-		if(!($entity instanceof NpcEntity || $entity instanceof MobNpcEntity || $entity instanceof BlockNpcEntity) || !isset($this->entities[$entity->getNpcId()])){
+		if(!($entity instanceof NpcEntity || $entity instanceof MobNpcEntity || $entity instanceof BlockNpcEntity || $entity instanceof ActorNpcEntity) || !isset($this->entities[$entity->getNpcId()])){
 			return;
 		}
 		$event->cancel();
 		$this->handleInteraction($entity, $event->getPlayer(), "right_click");
 	}
 
-	public function handleHit(NpcEntity|MobNpcEntity|BlockNpcEntity $entity, Player $player) : void{
+	public function handleHit(NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity $entity, Player $player) : void{
 		if(!isset($this->entities[$entity->getNpcId()])){
 			return;
 		}
@@ -848,7 +903,7 @@ final class NpcManager{
 		return $hadSession;
 	}
 
-	private function handleInteraction(NpcEntity|MobNpcEntity|BlockNpcEntity $entity, Player $player, string $trigger) : void{
+	private function handleInteraction(NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity $entity, Player $player, string $trigger) : void{
 		$definition = $this->definitions[$entity->getNpcId()] ?? null;
 		if($definition === null){
 			return;
@@ -870,7 +925,7 @@ final class NpcManager{
 		$this->executeCommands($definition, $player, $trigger);
 	}
 
-	private function playAnimation(NpcEntity|MobNpcEntity|BlockNpcEntity $entity, NpcDefinition $definition) : void{
+	private function playAnimation(NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity $entity, NpcDefinition $definition) : void{
 		if($entity instanceof MobNpcEntity){
 			$entity->playAnimation($definition->getAnimationType(), $definition->getAnimationId());
 			return;
@@ -969,18 +1024,19 @@ final class NpcManager{
 			$entity = $this->entities[$id] ?? null;
 			$query = $this->queryResults[$id] ?? null;
 			$lines[] = sprintf(
-				"%s: world=%s type=%s entity=%s lines=%d actions=%d equipment=%d skin=%s cooldown=%.2f interaction=%s nametag=%s rotate=%.1f count=%s",
+				"%s: world=%s type=%s entity=%s runtime-id=%s lines=%d actions=%d equipment=%d skin=%s cooldown=%.2f interaction=%s nametag=%s rotate=%.1f count=%s",
 				$id,
 				$definition->getWorld(),
 				$definition->getEntityType(),
 				$entity !== null && !$entity->isClosed() ? "yes" : "no",
+				$entity !== null && !$entity->isClosed() ? (string) $entity->getId() : "n/a",
 				count($definition->getLines()),
 				count($definition->getCommands()),
 				count($definition->getEquipment()),
 				$definition->getSkinFile() === "" ? "default" : $definition->getSkinFile(),
 				$definition->getCooldown(),
 				$definition->getInteractionMode(),
-				$definition->isNametagVisible() ? "yes" : "no",
+				$definition->getNametagVisibility(),
 				$definition->getRotationDistance(),
 				$query === null ? "n/a" : ($query["players"] . "/" . $query["max"] . " " . $query["status"])
 			);
@@ -993,7 +1049,14 @@ final class NpcManager{
 		$entity = $this->entities[$id] ?? null;
 		if($definition !== null && $entity !== null && !$entity->isClosed()){
 			$entity->setNameTag($this->renderLines($definition));
+			$this->applyNametagVisibility($entity, $definition);
 		}
+	}
+
+	private function applyNametagVisibility(Entity $entity, NpcDefinition $definition) : void{
+		$visibility = $definition->getNametagVisibility();
+		$entity->setNameTagVisible($visibility !== "never");
+		$entity->setNameTagAlwaysVisible($visibility === "always");
 	}
 
 	private function renderLines(NpcDefinition $definition) : string{
@@ -1319,14 +1382,27 @@ final class NpcManager{
 			return null;
 		}
 		$item = StringToItemParser::getInstance()->parse($blockId);
-		return $item?->getBlock();
+		if($item !== null){
+			return $item->getBlock();
+		}
+		// Numeric IDs are legacy compatibility input only. Axolotl-PM keeps the
+		// official deprecated parser for old configs, while new configs should use
+		// names such as "stone" or "minecraft:stone".
+		if(preg_match('/^\\d+(?::\\d+)?$/D', $blockId) === 1){
+			try{
+				return LegacyStringToItemParser::getInstance()->parse($blockId)->getBlock();
+			}catch(\Throwable $error){
+				$this->plugin->getLogger()->warning("NPC block '$blockId' uses an unsupported legacy block ID: " . $error->getMessage() . "; use a modern block name such as stone");
+			}
+		}
+		return null;
 	}
 
 	private function canFly(string $entityType) : bool{
 		return in_array($entityType, ["allay", "bat", "bee", "blaze", "ender_dragon", "ghast", "happy_ghast", "phantom", "vex"], true);
 	}
 
-	private function tickWalking(NpcDefinition $definition, NpcEntity|MobNpcEntity|BlockNpcEntity $entity) : void{
+	private function tickWalking(NpcDefinition $definition, NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity $entity) : void{
 		$path = $definition->getWalkPath();
 		if(count($path) < 1){
 			return;
@@ -1359,7 +1435,7 @@ final class NpcManager{
 		$entity->teleport($position->add($dx / $distance * $step, $dy / $distance * $step, $dz / $distance * $step), rad2deg(atan2(-$dx, $dz)), $target["pitch"]);
 	}
 
-	private function tickRandomEmote(NpcDefinition $definition, NpcEntity|MobNpcEntity|BlockNpcEntity $entity) : void{
+	private function tickRandomEmote(NpcDefinition $definition, NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity $entity) : void{
 		if(!($entity instanceof NpcEntity)){
 			return;
 		}
@@ -1418,7 +1494,7 @@ final class NpcManager{
 		}
 	}
 
-	private function rotateTowardsNearestPlayer(NpcEntity|MobNpcEntity|BlockNpcEntity $entity) : void{
+	private function rotateTowardsNearestPlayer(NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity $entity) : void{
 		$nearest = null;
 		$definition = $this->definitions[$entity->getNpcId()] ?? null;
 		$nearestDistance = ($definition?->getRotationDistance() ?? 16.0) ** 2;

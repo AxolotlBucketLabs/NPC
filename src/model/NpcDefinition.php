@@ -100,7 +100,8 @@ final class NpcDefinition{
 		private string $queryHost = "",
 		private int $queryPort = 19132,
 		private int $queryInterval = 200,
-		private string $blockId = ""
+		private string $blockId = "",
+		private string $nametagVisibility = "always"
 	){
 		self::validateId($id);
 		$this->lines = self::normalizeLines($lines);
@@ -130,6 +131,8 @@ final class NpcDefinition{
 		$this->queryPort = self::normalizePort($queryPort);
 		$this->queryInterval = self::normalizeQueryInterval($queryInterval);
 		$this->blockId = self::normalizeBlockId($blockId);
+		$this->nametagVisibility = self::normalizeNametagVisibility($nametagVisibility);
+		$this->nametagVisible = $this->nametagVisibility !== "never";
 	}
 
 	/** @param array<int|string, mixed> $data */
@@ -180,7 +183,8 @@ final class NpcDefinition{
 			self::stringValue($data, "query-host", ""),
 			self::intValue($data, "query-port", 19132),
 			self::intValue($data, "query-interval", 200),
-			self::stringValue($data, "block-id", "")
+			self::stringValue($data, "block-id", ""),
+			self::nametagVisibilityValue($data)
 		);
 	}
 
@@ -218,6 +222,7 @@ final class NpcDefinition{
 			"interact-commands" => $this->interactCommands,
 			"interaction-mode" => $this->interactionMode,
 			"nametag-visible" => $this->nametagVisible,
+			"nametag-visibility" => $this->nametagVisibility,
 			"rotation-distance" => $this->rotationDistance,
 			"walk-enabled" => $this->walkEnabled,
 			"walk-speed" => $this->walkSpeed,
@@ -272,6 +277,7 @@ final class NpcDefinition{
 	public function getInteractCommands() : array{ return $this->interactCommands; }
 	public function getInteractionMode() : string{ return $this->interactionMode; }
 	public function isNametagVisible() : bool{ return $this->nametagVisible; }
+	public function getNametagVisibility() : string{ return $this->nametagVisibility; }
 	public function getRotationDistance() : float{ return $this->rotationDistance; }
 	public function isWalkEnabled() : bool{ return $this->walkEnabled; }
 	public function getWalkSpeed() : float{ return $this->walkSpeed; }
@@ -345,7 +351,14 @@ final class NpcDefinition{
 	/** @param array<int|string, mixed> $commands */
 	public function setInteractCommands(array $commands) : void{ $this->interactCommands = self::normalizeCommands($commands); }
 	public function setInteractionMode(string $mode) : void{ $this->interactionMode = self::normalizeInteractionMode($mode); }
-	public function setNametagVisible(bool $visible) : void{ $this->nametagVisible = $visible; }
+	public function setNametagVisible(bool $visible) : void{
+		$this->nametagVisible = $visible;
+		$this->nametagVisibility = $visible ? "always" : "never";
+	}
+	public function setNametagVisibility(string $visibility) : void{
+		$this->nametagVisibility = self::normalizeNametagVisibility($visibility);
+		$this->nametagVisible = $this->nametagVisibility !== "never";
+	}
 	public function setRotationDistance(float $distance) : void{ $this->rotationDistance = self::normalizeRotationDistance($distance); }
 	public function setWalkEnabled(bool $enabled) : void{ $this->walkEnabled = $enabled; }
 	public function setWalkSpeed(float $speed) : void{ $this->walkSpeed = self::normalizeWalkSpeed($speed); }
@@ -566,6 +579,20 @@ final class NpcDefinition{
 	private static function normalizeBlockId(string $blockId) : string{
 		$blockId = strtolower(trim($blockId));
 		return preg_match('/^[a-z0-9_.-]+(?::[a-z0-9_.-]+)?$/D', $blockId) === 1 ? $blockId : "";
+	}
+
+	private static function normalizeNametagVisibility(string $visibility) : string{
+		$visibility = strtolower(str_replace("-", "_", trim($visibility)));
+		return in_array($visibility, ["never", "hover", "always"], true) ? $visibility : "always";
+	}
+
+	/** @param array<int|string, mixed> $data */
+	private static function nametagVisibilityValue(array $data) : string{
+		if(isset($data["nametag-visibility"]) && is_string($data["nametag-visibility"])){
+			return self::normalizeNametagVisibility($data["nametag-visibility"]);
+		}
+		// Keep old configs working: true was always visible, false was hidden.
+		return self::boolValue($data, "nametag-visible", true) ? "always" : "never";
 	}
 
 	private static function normalizeCooldown(float $cooldown) : float{

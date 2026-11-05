@@ -36,21 +36,22 @@ $definition->setAnimation("emote", "wave", 20, "right-click");
 if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 || $definition->getCooldown() !== 2.0 || $definition->getEntityType() !== "bee" || $definition->getAnimationType() !== "emote" || $definition->getAnimationId() !== "wave" || $definition->getAnimationInterval() !== 20 || $definition->getAnimationTrigger() !== "right_click"){
 	throw new RuntimeException("NpcDefinition basic state is invalid");
 }
-if(count(VanillaMobCatalog::all()) < 90 || VanillaMobCatalog::resolve("minecraft:zombie") !== "zombie" || VanillaMobCatalog::networkId("allay") !== "minecraft:allay" || VanillaMobCatalog::resolve("falling_block") !== "falling_block"){
+if(count(VanillaMobCatalog::all()) < 90 || VanillaMobCatalog::resolve("minecraft:zombie") !== "zombie" || VanillaMobCatalog::networkId("allay") !== "minecraft:allay" || VanillaMobCatalog::resolve("falling_block") !== "falling_block" || VanillaMobCatalog::networkId("boat") !== "minecraft:boat" || VanillaMobCatalog::networkId("minecart") !== "minecraft:minecart" || VanillaMobCatalog::networkId("tnt") !== "minecraft:tnt"){
 	throw new RuntimeException("Vanilla entity catalog is incomplete");
 }
-if(VanillaMobCatalog::iconPath("bee") !== "textures/items/spawn_eggs/spawn_egg_bee" || VanillaMobCatalog::iconPath("evoker") !== "textures/items/spawn_eggs/spawn_egg_evoker" || VanillaMobCatalog::iconPath("falling_block") !== "textures/blocks/stone" || VanillaMobCatalog::iconPath("unknown-custom") !== "textures/items/egg"){
+if(VanillaMobCatalog::iconPath("bee") !== "textures/items/spawn_eggs/spawn_egg_bee" || VanillaMobCatalog::iconPath("evoker") !== "textures/items/spawn_eggs/spawn_egg_evoker" || VanillaMobCatalog::iconPath("falling_block") !== "textures/blocks/stone" || VanillaMobCatalog::iconPath("boat") !== "textures/items/boat/boat_oak" || VanillaMobCatalog::iconPath("unknown-custom") !== "textures/items/egg"){
 	throw new RuntimeException("Vanilla form icon paths are invalid");
 }
 $definition->setInteractionMode("separate");
 $definition->setHitCommands(["message:hit"]);
 $definition->setInteractCommands(["message:interact"]);
 $definition->setNametagVisible(false);
+$definition->setNametagVisibility("hover");
 $definition->setRotationDistance(32.0);
 $definition->setPlayerCountMode("world");
 $definition->setWalkPath([["world" => "world", "x" => 1, "y" => 65, "z" => 2]]);
 $definition->setEmotePool(["wave", "simple_clap"]);
-if($definition->getInteractionMode() !== "separate" || $definition->getHitCommands() !== ["message:hit"] || $definition->isNametagVisible() || $definition->getRotationDistance() !== 32.0 || count($definition->getWalkPath()) !== 1 || count($definition->getEmotePool()) !== 2){
+if($definition->getInteractionMode() !== "separate" || $definition->getHitCommands() !== ["message:hit"] || !$definition->isNametagVisible() || $definition->getNametagVisibility() !== "hover" || $definition->getRotationDistance() !== 32.0 || count($definition->getWalkPath()) !== 1 || count($definition->getEmotePool()) !== 2){
 	throw new RuntimeException("NpcDefinition extended state is invalid");
 }
 if(EmoteCatalog::resolve("wave") !== "4c8ae710-df2e-47cd-814d-cc7bf21a3d67" || EmoteCatalog::resolve("4c8ae710-df2e-47cd-814d-cc7bf21a3d67") !== "4c8ae710-df2e-47cd-814d-cc7bf21a3d67" || EmoteCatalog::resolve("not-an-emote") !== null){
@@ -72,8 +73,13 @@ if(count($airGuitarVariants) !== 2 || $airGuitarVariants[0]["uuid"] !== "d1d6eae
 }
 
 $roundTrip = NpcDefinition::fromArray("welcome", $definition->toArray());
-if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRotateEnabled() || $roundTrip->getEquipment()["hand"] !== "iron_sword" || $roundTrip->getEntityType() !== "bee" || $roundTrip->getAnimationType() !== "emote" || $roundTrip->getAnimationTrigger() !== "right_click"){
+if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRotateEnabled() || $roundTrip->getEquipment()["hand"] !== "iron_sword" || $roundTrip->getEntityType() !== "bee" || $roundTrip->getAnimationType() !== "emote" || $roundTrip->getAnimationTrigger() !== "right_click" || $roundTrip->getNametagVisibility() !== "hover"){
 	throw new RuntimeException("NpcDefinition round trip failed");
+}
+
+$legacyVisibility = NpcDefinition::fromArray("legacy", ["lines" => ["legacy"], "nametag-visible" => false]);
+if($legacyVisibility->getNametagVisibility() !== "never" || $legacyVisibility->isNametagVisible()){
+	throw new RuntimeException("Legacy nametag visibility migration failed");
 }
 
 $roundTrip->setScale(9.0);

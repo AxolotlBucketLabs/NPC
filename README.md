@@ -29,10 +29,10 @@ The first deployable milestone includes:
 - `/npc ui`, a PMForms-backed operator GUI for creating, editing, importing and deleting NPCs;
 - a paginated/searchable entity picker with Vanilla `IMAGE_TYPE_PATH` icons: mob spawn eggs, the NPC egg for Human, and a stone block icon for FallingBlock;
 - Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click event triggers;
-- every current Vanilla Bedrock mob network type from Axolotl-PM's entity catalog, plus passive `falling_block`/FallingSand actors;
+- every current Vanilla Bedrock mob network type from Axolotl-PM's entity catalog, plus passive `falling_block`, `boat`, `minecart`, and `primed_tnt` actors;
 - a safe custom visual-entity registry through `Main::registerEntityType()` without arbitrary PHP class loading;
 - shared interaction actions by default, with opt-in `separate` hit/interact actions and `message:` direct messages;
-- optional walking paths (off by default), configurable nametag visibility, rotation distance, and asynchronous allowlisted HTTPS skin URLs;
+- optional walking paths (off by default), `never`/`hover`/`always` nametag visibility, rotation distance, and asynchronous allowlisted HTTPS skin URLs;
 - random player-emote pools (off by default) and a right-click sneak editor that opens the same PMForms editor as `/npc ui`;
 - server-local and per-world player counts, plus optional remote Bedrock counts through the renamed `BedrockQuery` plugin;
 - the bundled Bedrock Marketplace emote catalog (2,000+ title/UUID entries), including `wave`, `simple_clap`, `over_there`, `bow`, and many more, plus arbitrary valid Bedrock emote IDs;
@@ -63,15 +63,15 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc particle-type <id> <type>
 /npc sound-type <id> <type>
 /npc menuname <id> <name|remove>
-/npc type <id> <human|any-vanilla-mob|falling_block>
+/npc type <id> <human|any-vanilla-mob|boat|minecart|primed_tnt|falling_block>
 /npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]
 /npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]
 /npc emotes [search]
 /npc random-emote <id> <on|off> [seconds] [emote...]
-/npc namevisible <id> <on|off>
+/npc namevisibility <id> <never|hover|always>
 /npc rotation-distance <id> <blocks>
 /npc playercount <id> <none|server|world|query> [world|host] [port]
-/npc block <id> <block-id|clear>
+/npc block <id> <block-name|legacy-id:meta|clear>
 /npc walk <id> <on|off|add|clear> [speed]
 /npc ui
 /npc rotate <id> <on|off>
@@ -119,7 +119,8 @@ npcs:
     equipment:
       hand: iron_sword
       helmet: iron_helmet
-    nametag-visible: true
+    nametag-visible: true # legacy boolean; retained for old configs
+    nametag-visibility: always # never, hover, or always
     rotation-distance: 16
     player-count-mode: server
     player-count-world: ""
@@ -145,9 +146,13 @@ The GUI is permission-gated by `npc.admin`. It is a control surface for trusted 
 
 ## Entity types, emotes and animations
 
-Human is the default and supports local/remote skins, cape/geometry data, equipment, player-list menu names, and player emotes. Every Vanilla mob in the current Bedrock entity ID table is available as a passive visual actor (`zombie`, `allay`, `camel`, `warden`, `happy_ghast`, and so on); `/npc entities` prints the exact catalog. These are visual actors, not native mob AI: they do not pathfind, attack, breed, drop loot, or persist as world entities. `falling_block` is a passive block actor and reads its visual from `block-id: stone` (or any valid PocketMine item/block alias). Skins/equipment/player-list menu names apply only to Human actors. `animation-type: fly` remains a visual hover/orbit state for the flying display types, not native AI.
+Human is the default and supports local/remote skins, cape/geometry data, equipment, player-list menu names, and player emotes. Every Vanilla mob in the current Bedrock entity ID table is available as a passive visual actor (`zombie`, `allay`, `camel`, `warden`, `happy_ghast`, and so on); `/npc entities` prints the exact catalog. These are visual actors, not native mob AI: they do not pathfind, attack, breed, drop loot, or persist as world entities. `falling_block` is a passive block actor and reads its visual from `block-id: stone` (or any valid PocketMine item/block alias). `boat`, `minecart`, and `primed_tnt` are also visual-only actors: they do not float, ride, move, prime, or explode. Skins/equipment/player-list menu names apply only to Human actors. `animation-type: fly` remains a visual hover/orbit state for the flying display types, not native AI.
 
-The UI entity picker uses client-side Vanilla resource-pack paths rather than remote image URLs. Most current mobs use `textures/items/spawn_eggs/spawn_egg_<entity>`, while compatibility aliases use their Vanilla paths (`egg_npc`, `spawn_egg_evoker`, `spawn_egg_zombified_piglin`, and so on). Human uses the Vanilla NPC egg icon and `falling_block` uses `textures/blocks/stone`. The selected path is only an icon; it does not change the passive actor implementation or add mob AI. A custom registered actor receives the generic Vanilla egg fallback unless its type is added to the catalog mapping.
+The UI entity picker uses client-side Vanilla resource-pack paths rather than remote image URLs. Most current mobs use `textures/items/spawn_eggs/spawn_egg_<entity>`, while compatibility aliases use their Vanilla paths (`egg_npc`, `spawn_egg_evoker`, `spawn_egg_zombified_piglin`, and so on). Human uses the Vanilla NPC egg icon, `falling_block` uses `textures/blocks/stone`, `boat` uses the oak boat texture, `minecart` uses its item texture, and `primed_tnt` uses the TNT side texture. The selected path is only an icon; it does not change the passive actor implementation or add mob AI. A custom registered actor receives the generic Vanilla egg fallback unless its type is added to the catalog mapping.
+
+Nametags support three Bedrock metadata modes. `always` shows the nametag at all distances supported by the client, `hover` shows it when the player points at the actor, and `never` hides it. The old `nametag-visible: true|false` key and `/npc namevisible <id> <on|off>` command remain compatible; when an old boolean is loaded it is migrated to `always` or `never`. `/npc namevisibility` is the new mode-aware command.
+
+For `falling_block`, prefer modern names such as `stone`, `minecraft:stone`, or another registered item/block alias. Axolotl-PM still exposes its official deprecated `LegacyStringToItemParser`, so numeric inputs such as `1:0` are accepted only as compatibility input and are not mapped by NPC itself. Unsupported numeric IDs are rejected with a migration hint instead of being guessed; current block state IDs should not be stored as legacy numbers.
 
 Player emotes, actor animations, and particles are separate controls:
 
@@ -194,7 +199,7 @@ The `/slapper` command alias accepts the historical Human/Player workflow withou
 /slapper edit <id> menuname <name|remove>
 ```
 
-The compatibility layer now accepts all catalogued visual types instead of silently coercing them to Human. `/npc id` (or `/slapper id`) waits for a hit and reports both the stable NPC ID and the current network entity ID. `/npc remove` without an ID waits for a hit and removes only the selected NPC definition; `/npc cancel` clears the pending session. Right-click and left-click both run the shared action list by default, preserving one behavior for users who do not want to distinguish them. Set `interaction-mode: separate` to add `interact-commands` and `hit-commands`; the shared list still runs first. `/npc menuname <id> <name|remove>` keeps a Human-style NPC in the Bedrock player list with the requested name and removes the row cleanly when disabled.
+The compatibility layer now accepts all catalogued visual types instead of silently coercing them to Human. `/npc id` (or `/slapper id`) waits for a hit and reports both the stable NPC ID and the current network entity ID. All ID-first edit/remove commands also accept the currently spawned numeric entity ID and normalize it to the stable NPC definition ID. `/npc remove` without an ID waits for a hit and removes only the selected NPC definition; `/npc cancel` clears the pending session. Right-click and left-click both run the shared action list by default, preserving one behavior for users who do not want to distinguish them. Set `interaction-mode: separate` to add `interact-commands` and `hit-commands`; the shared list still runs first. `/npc menuname <id> <name|remove>` keeps a Human-style NPC in the Bedrock player list with the requested name and removes the row cleanly when disabled.
 
 When the old Slapper plugin is still installed and its entities are loaded, an operator can import the Human entities with:
 

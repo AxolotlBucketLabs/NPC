@@ -8,6 +8,7 @@ use NhanAZ\NPC\command\NpcCommandHandler;
 use NhanAZ\NPC\entity\NpcEntity;
 use NhanAZ\NPC\entity\MobNpcEntity;
 use NhanAZ\NPC\entity\BlockNpcEntity;
+use NhanAZ\NPC\entity\ActorNpcEntity;
 use NhanAZ\NPC\integration\ScoreHudIntegration;
 use NhanAZ\NPC\manager\NpcManager;
 use NhanAZ\NPC\model\EmoteCatalog;
@@ -82,7 +83,7 @@ final class Main extends PluginBase implements Listener{
 
 	public function onPlayerEntityInteract(PlayerEntityInteractEvent $event) : void{
 		$entity = $event->getEntity();
-		if($entity instanceof NpcEntity || $entity instanceof MobNpcEntity || $entity instanceof BlockNpcEntity){
+		if($entity instanceof NpcEntity || $entity instanceof MobNpcEntity || $entity instanceof BlockNpcEntity || $entity instanceof ActorNpcEntity){
 			if($event->getPlayer()->isSneaking() && $event->getPlayer()->hasPermission("npc.admin")){
 				$event->cancel();
 				$this->commandHandler->openEditor($event->getPlayer(), $entity->getNpcId());
@@ -97,7 +98,7 @@ final class Main extends PluginBase implements Listener{
 	 */
 	public function onEntityDamage(EntityDamageEvent $event) : void{
 		$entity = $event->getEntity();
-		if($entity instanceof NpcEntity || $entity instanceof MobNpcEntity || $entity instanceof BlockNpcEntity){
+		if($entity instanceof NpcEntity || $entity instanceof MobNpcEntity || $entity instanceof BlockNpcEntity || $entity instanceof ActorNpcEntity){
 			$event->cancel();
 			if($event instanceof EntityDamageByEntityEvent && $event->getDamager() instanceof Player){
 				$this->npcManager->handleHit($entity, $event->getDamager());
