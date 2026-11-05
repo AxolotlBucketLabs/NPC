@@ -30,7 +30,7 @@ The first deployable milestone includes:
 - Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click animation triggers;
 - `arm_swing`, `hurt`, `critical_hit`, `magic_critical`, and player emote animation packets;
 - optional ScoreHud integration with live `npc.*` tags;
-- DevTools PHAR packaging with the PMForms virion bundled locally, plus PHPStan Level Max in CI.
+- DevTools PHAR packaging with the PMForms virion prepared from its pinned Composer source, plus PHPStan Level Max in CI.
 
 NPC actions are configured by operators only. A player cannot write an action or a skin URL through the public command surface.
 
@@ -100,7 +100,7 @@ Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, o
 
 ## Operator UI
 
-`/npc ui` opens the operator menu built with the local `pmforms` virion. The menu can create an NPC, edit its name/type/skin/effects/animation, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. The form library is packaged into `NPC.phar`; a separate forms plugin is not required at runtime.
+`/npc ui` opens the operator menu built with the `pmforms` virion. The menu can create an NPC, edit its name/type/skin/effects/animation, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. DevTools prepares PMForms from the pinned `NhanAZ-Libraries/pmforms` Composer source and packages it into `NPC.phar`; a separate forms plugin is not required at runtime.
 
 The GUI is permission-gated by `npc.admin`. It is a control surface for trusted operators, not a player-facing NPC interaction menu.
 
@@ -178,7 +178,9 @@ The tags are resolved in the viewer's current world. `npc.nearest_*` values refe
 
 The old Slapper repositories and Poggit Archive pages supplied for this project are treated as feature references only. No source code has been copied into this implementation; license and API behavior will be reviewed separately for each future adapter.
 
-## Local verification
+## Dependency and local verification
+
+PMForms is intentionally not copied into this repository. `composer.lock` pins the PMForms release and its Axolotl-PM platform package, while DevTools' `prepare-dependencies` step creates the ignored `.devtools-virions/` directory from that lockfile. The GitHub workflows use the same preparation path, so the source remains maintained in [NhanAZ-Libraries/pmforms](https://github.com/NhanAZ-Libraries/pmforms) and only the shaded library is present in the final PHAR.
 
 The commands below use the current local Axolotl-PM checkout and the relocated PHP 8.4 binary:
 
@@ -187,8 +189,11 @@ $php = 'C:\PHP-Binaries\PHP-8.4-Windows-x64-PM5-webrtc-0.3.1\bin\php\php.exe'
 $devtools = 'C:\Users\NhanAZ\Documents\GitHub\DevTools'
 $server = 'C:\Users\NhanAZ\Documents\GitHub\PocketMine-MP'
 
-& $php "$devtools\bin\devtools.php" doctor --project="$PWD" --json
-& $php -d phar.readonly=0 "$devtools\bin\devtools.php" build --project="$PWD" --virions="$PWD\virions" --out="$PWD\build" --overwrite --json
+& composer install --no-dev --no-scripts --no-plugins --no-autoloader --no-interaction --no-progress
+if (Test-Path "$PWD\.devtools-virions") { Remove-Item -LiteralPath "$PWD\.devtools-virions" -Recurse -Force }
+& $php "$devtools\bin\devtools.php" prepare --project="$PWD" --virions="$PWD\.devtools-virions" --json
+& $php "$devtools\bin\devtools.php" doctor --project="$PWD" --virions="$PWD\.devtools-virions" --json
+& $php -d phar.readonly=0 "$devtools\bin\devtools.php" build --project="$PWD" --virions="$PWD\.devtools-virions" --out="$PWD\build" --overwrite --json
 & $php "$devtools\bin\devtools.php" inspect --project="$PWD" --artifact="$PWD\build\NPC.phar" --json
 ```
 

@@ -2,6 +2,7 @@
 /build/*.json
 /build/*.txt
 /vendor/
+/.devtools-virions/
 /.phpunit.cache/
 /.phpstan-tmp/
 /.phpstan.cache/

@@ -13,3 +13,5 @@ jobs:
     uses: NhanAZ/DevTools/.github/workflows/release-plugin.yml@8b7db655845dc5d9e5e51b26a5d0815d5f7e5323 # v2.1.1
     with:
       mode: tag
+      prepare-dependencies: true
+      virions: .devtools-virions

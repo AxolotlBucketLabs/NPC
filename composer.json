@@ -1,0 +1,25 @@
+{
+    "name": "nhanaz/npc-build",
+    "type": "pocketmine-plugin",
+    "private": true,
+    "license": "MIT",
+    "require": {
+        "axolotl-pm/pocketmine-mp": "~5.51.1",
+        "dktapps/pmforms": "dev-master"
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/NhanAZ-Libraries/pmforms"
+        }
+    ],
+    "config": {
+        "allow-plugins": false,
+        "platform": {
+            "php": "8.4.0"
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
