@@ -28,7 +28,7 @@ The first deployable milestone includes:
 - edit aliases for names, commands, hand/armor equipment, scale, reload, and teleporting an NPC or player;
 - `/npc ui`, a PMForms-backed operator GUI for creating, editing, importing and deleting NPCs;
 - Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click event triggers;
-- player emotes such as `wave`, `simple_clap`, `over_there`, `over_here`, `bow`, `saluting`, and `thinking`, plus arbitrary valid Bedrock emote UUIDs;
+- the bundled Bedrock Marketplace emote catalog (2,000+ title/UUID entries), including `wave`, `simple_clap`, `over_there`, `bow`, and many more, plus arbitrary valid Bedrock emote IDs;
 - actor animations (`fly` for the Bee wing/flight state, plus `arm_swing`, `hurt`, `critical_hit`, and `magic_critical`) kept separate from player emotes;
 - optional ScoreHud integration with live `npc.*` tags;
 - DevTools PHAR packaging with the PMForms virion prepared from its pinned Composer source, plus PHPStan Level Max in CI.
@@ -55,6 +55,7 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc type <id> <human|bee>
 /npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]
 /npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]
+/npc emotes [search]
 /npc ui
 /npc rotate <id> <on|off>
 /npc particle <id> <on|off>
@@ -112,7 +113,7 @@ Human is the default and supports local skins, cape/geometry data, equipment, pl
 
 Player emotes, actor animations, and particles are separate controls:
 
-- `/npc emote` sends a Bedrock player-emote packet. Friendly aliases resolve to the corresponding Bedrock UUID, and any valid Bedrock emote UUID is accepted so the catalog is not artificially limited to the aliases shipped with this plugin.
+- `/npc emote` sends a Bedrock player-emote packet. Names are normalized and resolved through the bundled 2,000+ entry title/UUID catalog; use `/npc emotes [search]` in-game to browse it. Any valid Bedrock emote ID is also accepted, so a new Marketplace entry can be used before the bundled snapshot is refreshed.
 - `/npc animation` controls actor animation/state: `fly` enables the Bee wing/flight state and passive hover/orbit, while arm swing, hurt, critical hit, and magic critical send actor event animations. None of these are player emotes.
 - `/npc particle` and `/npc particle-type` control particles independently of both emote and actor animation controls.
 
@@ -127,6 +128,8 @@ animation-trigger: right_click
 ```
 
 The old `animation-type: emote` and `animation-id: wave` form remains valid; `wave` is resolved to its Bedrock emote UUID before the packet is sent. For a Bee visual NPC, use `entity-type: bee` and `animation-type: fly`. The `animation-id` is ignored for `fly`; the interval is retained for compatibility but continuous flight is updated every server tick.
+
+The bundled name catalog is generated from [TwistedAsylumMC/Bedrock-Emotes](https://github.com/TwistedAsylumMC/Bedrock-Emotes)' `emotes.json` snapshot. Only title and UUID pairs are included; Marketplace images, offers and other metadata are not copied. Duplicate titles remain addressable by entering the UUID directly.
 
 Use `timer` for a repeating emote or actor animation, `spawn` for one event when the NPC is spawned, or `right_click`/`left_click` for interaction-triggered events. Client support for a particular emote is controlled by the Bedrock client; the packet is sent only for the selected Human NPC. Bee motion is updated continuously and does not use an emote packet.
 

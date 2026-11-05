@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace NhanAZ\NPC\model;
 
+use JsonException;
+use function count;
+use function json_decode;
 use function preg_match;
-use function str_replace;
+use function preg_replace;
+use function preg_split;
+use function str_contains;
 use function strtolower;
 use function trim;
 
@@ -23,7 +28,86 @@ final class EmoteCatalog{
 		"thinking" => "20bcb500-af82-4c2f-9239-e78191c61375"
 	];
 
+	/** @var array<string, string> */
+	private static array $catalog = self::ALIASES;
+
+	/** @var array<string, string> */
+	private static array $displayNames = [];
+
+	/** @var list<array{title: string, uuid: string}> */
+	private static array $entries = [];
+
 	private function __construct(){
+	}
+
+	/**
+	 * Loads the generated title-to-UUID catalog bundled in resources/emotes.jsonl.
+	 * Duplicate Marketplace titles are kept addressable through their UUIDs; the
+	 * first title wins for the convenient name lookup.
+	 */
+	public static function load(string $contents) : int{
+		$loaded = 0;
+		$lines = preg_split('/\R/u', $contents, -1, PREG_SPLIT_NO_EMPTY);
+		if($lines === false){
+			return 0;
+		}
+		foreach($lines as $line){
+			try{
+				$entry = json_decode(trim($line), true, 512, JSON_THROW_ON_ERROR);
+			}catch(JsonException){
+				continue;
+			}
+			if(!is_array($entry) || !is_string($entry["title"] ?? null) || !is_string($entry["uuid"] ?? null)){
+				continue;
+			}
+			$uuid = strtolower(trim($entry["uuid"]));
+			$alias = self::normalizeAlias($entry["title"]);
+			if($alias === "" || !self::isUuid($uuid)){
+				continue;
+			}
+			self::$entries[] = ["title" => $entry["title"], "uuid" => $uuid];
+			if(!isset(self::$catalog[$alias])){
+				self::$catalog[$alias] = $uuid;
+				self::$displayNames[$alias] = $entry["title"];
+			}
+			++$loaded;
+		}
+		return $loaded;
+	}
+
+	public static function count() : int{
+		return self::$entries === [] ? count(self::$catalog) : count(self::$entries);
+	}
+
+	/** @return list<array{title: string, uuid: string}> */
+	public static function search(string $query = "", int $limit = 25) : array{
+		$query = self::normalizeAlias($query);
+		$matches = [];
+		if(self::$entries !== []){
+			foreach(self::$entries as $entry){
+				if($query !== "" && !str_contains(self::normalizeAlias($entry["title"]), $query)){
+					continue;
+				}
+				$matches[] = $entry;
+				if(count($matches) >= max(1, $limit)){
+					break;
+				}
+			}
+			return $matches;
+		}
+		foreach(self::$catalog as $alias => $uuid){
+			if($query !== "" && !str_contains($alias, $query)){
+				continue;
+			}
+			$matches[] = [
+				"title" => self::$displayNames[$alias] ?? $alias,
+				"uuid" => $uuid
+			];
+			if(count($matches) >= max(1, $limit)){
+				break;
+			}
+		}
+		return $matches;
 	}
 
 	/**
@@ -34,11 +118,24 @@ final class EmoteCatalog{
 	 */
 	public static function resolve(string $value) : ?string{
 		$raw = trim($value);
-		$alias = strtolower(str_replace(["-", " "], "_", $raw));
-		if(isset(self::ALIASES[$alias])){
-			return self::ALIASES[$alias];
+		$alias = self::normalizeAlias($raw);
+		if(isset(self::$catalog[$alias])){
+			return self::$catalog[$alias];
 		}
 		$uuid = strtolower($raw);
-		return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $uuid) === 1 ? $uuid : null;
+		return self::isUuid($uuid) ? $uuid : null;
+	}
+
+	private static function normalizeAlias(string $value) : string{
+		$value = strtolower(trim($value));
+		$value = (string) preg_replace('/[^a-z0-9]+/', "_", $value);
+		return trim($value, "_");
+	}
+
+	private static function isUuid(string $value) : bool{
+		// Bedrock emote IDs look like UUIDs but are not guaranteed to follow
+		// RFC 4122 version/variant bits (the Marketplace catalog contains IDs
+		// such as f8721633-b6e8-b55c-fe38-984f52d756bc).
+		return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $value) === 1;
 	}
 }

@@ -9,6 +9,7 @@ use NhanAZ\NPC\entity\NpcEntity;
 use NhanAZ\NPC\entity\MobNpcEntity;
 use NhanAZ\NPC\integration\ScoreHudIntegration;
 use NhanAZ\NPC\manager\NpcManager;
+use NhanAZ\NPC\model\EmoteCatalog;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
 use pocketmine\event\Listener;
@@ -18,6 +19,7 @@ use pocketmine\event\player\PlayerEntityInteractEvent;
 use pocketmine\player\Player;
 use pocketmine\plugin\PluginBase;
 use pocketmine\scheduler\ClosureTask;
+use function stream_get_contents;
 
 final class Main extends PluginBase implements Listener{
 
@@ -27,6 +29,11 @@ final class Main extends PluginBase implements Listener{
 
 	protected function onEnable() : void{
 		$this->saveResource("config.yml");
+		$emoteResource = $this->getResource("emotes.jsonl");
+		if($emoteResource !== null){
+			EmoteCatalog::load((string) stream_get_contents($emoteResource));
+			fclose($emoteResource);
+		}
 
 		$this->npcManager = new NpcManager($this);
 		$this->commandHandler = new NpcCommandHandler($this->npcManager);

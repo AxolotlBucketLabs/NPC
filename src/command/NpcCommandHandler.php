@@ -75,6 +75,7 @@ final class NpcCommandHandler{
 			case "type": case "entity-type": return $this->entityType($sender, $args);
 			case "animation": return $this->animation($sender, $args);
 			case "emote": return $this->emote($sender, $args);
+			case "emotes": case "emote-list": return $this->emotes($sender, $args);
 			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
 			case "tp": return $this->teleport($sender, $args);
 			case "reload": $this->manager->reload(); $sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded."); return true;
@@ -128,6 +129,7 @@ final class NpcCommandHandler{
 			"/npc type <id> <human|bee>",
 			"/npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]",
 			"/npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]",
+			"/npc emotes [search]",
 			"/npc ui",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc debug | /npc reload"
@@ -503,6 +505,18 @@ final class NpcCommandHandler{
 		$trigger = strtolower(str_replace("-", "_", (string) (array_shift($args) ?? "timer")));
 		$ok = $this->manager->setAnimation($id, "emote", $emote, $interval !== null && is_numeric($interval) ? (int) $interval : 100, $trigger);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC player emote updated." : TextFormat::RED . "NPC not found or emote is invalid.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function emotes(CommandSender $sender, array $args) : bool{
+		$query = trim(implode(" ", $args));
+		$matches = EmoteCatalog::search($query, 30);
+		$sender->sendMessage(TextFormat::AQUA . "Emote catalog (" . EmoteCatalog::count() . ", showing " . count($matches) . "):" . ($query === "" ? "" : " search=$query"));
+		foreach($matches as $match){
+			$sender->sendMessage(TextFormat::GRAY . "- " . $match["title"] . TextFormat::DARK_GRAY . " => " . $match["uuid"]);
+		}
+		$sender->sendMessage(TextFormat::YELLOW . "Use /npc emote <id> <name|UUID> [interval] [trigger]. Duplicate names can use the UUID directly.");
 		return true;
 	}
 

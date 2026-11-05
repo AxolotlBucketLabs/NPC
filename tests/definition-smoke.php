@@ -37,6 +37,13 @@ if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 ||
 if(EmoteCatalog::resolve("wave") !== "4c8ae710-df2e-47cd-814d-cc7bf21a3d67" || EmoteCatalog::resolve("4c8ae710-df2e-47cd-814d-cc7bf21a3d67") !== "4c8ae710-df2e-47cd-814d-cc7bf21a3d67" || EmoteCatalog::resolve("not-an-emote") !== null){
 	throw new RuntimeException("Bedrock emote resolution failed");
 }
+if(EmoteCatalog::load("{\"title\":\"Bee Dance\",\"uuid\":\"4c8ae710-df2e-47cd-814d-cc7bf21a3d67\"}\n{\"title\":\"NPC Cheer\",\"uuid\":\"9a469a61-c83b-4ba9-b507-bdbe64430582\"}") !== 2 || EmoteCatalog::resolve("bee dance") !== "4c8ae710-df2e-47cd-814d-cc7bf21a3d67"){
+	throw new RuntimeException("Emote catalog loading failed");
+}
+$emoteCatalog = file_get_contents(dirname(__DIR__) . '/resources/emotes.jsonl');
+if($emoteCatalog === false || EmoteCatalog::load($emoteCatalog) < 1000 || EmoteCatalog::resolve("4th dimension") !== "5f2c9473-ff88-ed4f-674b-9943dd6c81f2" || EmoteCatalog::resolve("tp random") !== "f8721633-b6e8-b55c-fe38-984f52d756bc"){
+	throw new RuntimeException("Bundled Marketplace emote catalog failed");
+}
 
 $roundTrip = NpcDefinition::fromArray("welcome", $definition->toArray());
 if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRotateEnabled() || $roundTrip->getEquipment()["hand"] !== "iron_sword" || $roundTrip->getEntityType() !== "bee" || $roundTrip->getAnimationType() !== "emote" || $roundTrip->getAnimationTrigger() !== "right_click"){
