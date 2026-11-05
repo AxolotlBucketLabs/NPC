@@ -124,7 +124,7 @@ final class NpcCommandHandler{
 			"/npc sound-type <id> <click|pop|door_bump|...>",
 			"/npc menuname <id> <name|remove>",
 			"/npc type <id> <human|bee>",
-			"/npc animation <id> <none|emote|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]",
+			"/npc animation <id> <none|emote|fly|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]",
 			"/npc ui",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc debug | /npc reload"
@@ -459,8 +459,8 @@ final class NpcCommandHandler{
 		$animationId = (string) (array_shift($args) ?? "");
 		$interval = array_shift($args);
 		$trigger = strtolower(str_replace("-", "_", (string) (array_shift($args) ?? "timer")));
-		if($id === null || !in_array($type, ["none", "emote", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
-			$sender->sendMessage(TextFormat::YELLOW . "/npc animation <id> <none|emote|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]");
+		if($id === null || !in_array($type, ["none", "emote", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc animation <id> <none|emote|fly|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]");
 			return true;
 		}
 		$ok = $this->manager->setAnimation($id, $type, $animationId, $interval !== null && is_numeric($interval) ? (int) $interval : 100, $trigger);

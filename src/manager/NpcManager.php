@@ -151,6 +151,9 @@ final class NpcManager{
 			if($entity === null){
 				continue;
 			}
+			if($entity instanceof MobNpcEntity && $definition->getAnimationType() === "fly"){
+				$entity->tickFlight($tick);
+			}
 
 			if($definition->getAnimationTrigger() === "timer" && $tick % $definition->getAnimationInterval() === 0){
 				$this->playAnimation($entity, $definition);
@@ -331,7 +334,7 @@ final class NpcManager{
 
 	public function setAnimation(string $id, string $type, string $animationId = "", int $interval = 100, string $trigger = "timer") : bool{
 		$definition = $this->definitions[$id] ?? null;
-		if($definition === null || !in_array(strtolower(str_replace("-", "_", $type)), ["none", "emote", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
+		if($definition === null || !in_array(strtolower(str_replace("-", "_", $type)), ["none", "emote", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
 			return false;
 		}
 		$definition->setAnimation($type, $animationId, $interval, $trigger);
@@ -672,6 +675,10 @@ final class NpcManager{
 	}
 
 	private function playAnimation(Living $entity, NpcDefinition $definition) : void{
+		if($entity instanceof MobNpcEntity){
+			$entity->playAnimation($definition->getAnimationType(), $definition->getAnimationId());
+			return;
+		}
 		switch($definition->getAnimationType()){
 			case "emote":
 				if($entity instanceof NpcEntity && $definition->getAnimationId() !== ""){

@@ -131,8 +131,8 @@ final class NpcUiManager{
 			return;
 		}
 		$typeOptions = ["Human", "Bee"];
-		$animationOptions = ["None", "Emote", "Arm swing", "Hurt", "Critical hit", "Magic critical"];
-		$animationTypes = ["none", "emote", "arm_swing", "hurt", "critical_hit", "magic_critical"];
+		$animationOptions = ["None", "Emote", "Fly (Bee)", "Arm swing", "Hurt", "Critical hit", "Magic critical"];
+		$animationTypes = ["none", "emote", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"];
 		$triggers = ["Timer", "Spawn", "Right click", "Left click"];
 		$triggerValues = ["timer", "spawn", "right_click", "left_click"];
 		$player->sendForm(new CustomForm(
@@ -150,7 +150,7 @@ final class NpcUiManager{
 				new Input("particle_type", "Particle type", "flame", $definition->getParticleType()),
 				new Input("sound_type", "Sound type", "click", $definition->getSoundType()),
 				new Dropdown("animation", "Animation", $animationOptions, max(0, array_search($definition->getAnimationType(), $animationTypes, true))),
-				new Input("animation_id", "Emote ID (only for emote)", "UUID", $definition->getAnimationId()),
+				new Input("animation_id", "Emote ID (only for emote)", "wave", $definition->getAnimationId()),
 				new Input("animation_interval", "Animation interval in ticks", "100", (string) $definition->getAnimationInterval()),
 				new Dropdown("animation_trigger", "Animation trigger", $triggers, max(0, array_search($definition->getAnimationTrigger(), $triggerValues, true)))
 			],

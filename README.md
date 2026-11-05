@@ -28,7 +28,7 @@ The first deployable milestone includes:
 - edit aliases for names, commands, hand/armor equipment, scale, reload, and teleporting an NPC or player;
 - `/npc ui`, a PMForms-backed operator GUI for creating, editing, importing and deleting NPCs;
 - Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click animation triggers;
-- `arm_swing`, `hurt`, `critical_hit`, `magic_critical`, and player emote animation packets;
+- `fly` for a passive Bee hover/orbit, plus `arm_swing`, `hurt`, `critical_hit`, `magic_critical`, and player emote animation packets;
 - optional ScoreHud integration with live `npc.*` tags;
 - DevTools PHAR packaging with the PMForms virion prepared from its pinned Composer source, plus PHPStan Level Max in CI.
 
@@ -52,7 +52,7 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc sound-type <id> <type>
 /npc menuname <id> <name|remove>
 /npc type <id> <human|bee>
-/npc animation <id> <none|emote|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]
+/npc animation <id> <none|emote|fly|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]
 /npc ui
 /npc rotate <id> <on|off>
 /npc particle <id> <on|off>
@@ -106,7 +106,7 @@ The GUI is permission-gated by `npc.admin`. It is a control surface for trusted 
 
 ## Entity types and animations
 
-Human is the default and supports local skins, cape/geometry data, equipment, player-list menu names, and emotes. `bee` is a lightweight visual mob actor using the Bedrock `minecraft:bee` network identifier. It is not a full Bee AI implementation: it does not pathfind, pollinate, or persist as a world entity. Skins and equipment are disabled for Bee definitions.
+Human is the default and supports local skins, cape/geometry data, equipment, player-list menu names, and emotes. `bee` is a lightweight visual mob actor using the Bedrock `minecraft:bee` network identifier. It is not a full Bee AI implementation: it does not pathfind, pollinate, or persist as a world entity. Skins and equipment are disabled for Bee definitions. With `animation-type: fly`, the plugin moves the actor through a small passive hover/orbit and advertises the Bedrock flying metadata flag; this is visual movement, not native Bee AI.
 
 Animation configuration is stored with the NPC definition:
 
@@ -117,6 +117,8 @@ animation-id: wave
 animation-interval: 100
 animation-trigger: right_click
 ```
+
+For a Bee visual NPC, use `entity-type: bee` and `animation-type: fly`. The `animation-id` is ignored for `fly`; the interval is retained for compatibility but continuous flight is updated every server tick.
 
 Use `timer` for a repeating animation, `spawn` for one animation when the NPC is spawned, or `right_click`/`left_click` for interaction-triggered animation. Client support for a particular emote is controlled by the Bedrock client; packet support is sent only for the selected actor.
 

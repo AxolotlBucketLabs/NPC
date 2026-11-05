@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/src/model/NpcDefinition.php';
+require dirname(__DIR__) . '/src/model/FlightPattern.php';
 
 use NhanAZ\NPC\model\NpcDefinition;
+use NhanAZ\NPC\model\FlightPattern;
 
 $definition = new NpcDefinition(
 	"welcome",
@@ -49,6 +51,16 @@ if($roundTrip->getParticleType() !== "happy_villager" || $roundTrip->getSoundTyp
 }
 if($roundTrip->getMenuName() !== "Lobby NPC" || NpcDefinition::fromArray("welcome", $roundTrip->toArray())->getMenuName() !== "Lobby NPC"){
 	throw new RuntimeException("NpcDefinition menu name round trip failed");
+}
+
+$roundTrip->setAnimation("fly", "", 1, "timer");
+if($roundTrip->getAnimationType() !== "fly" || NpcDefinition::fromArray("welcome", $roundTrip->toArray())->getAnimationType() !== "fly"){
+	throw new RuntimeException("Bee flight animation round trip failed");
+}
+
+$phase = FlightPattern::phaseFor("welcome");
+if(FlightPattern::offset(0, $phase) === FlightPattern::offset(20, $phase)){
+	throw new RuntimeException("Bee flight path did not change over time");
 }
 
 try{

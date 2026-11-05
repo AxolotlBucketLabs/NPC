@@ -327,7 +327,7 @@ final class NpcDefinition{
 
 	private static function normalizeAnimationType(string $type) : string{
 		$type = strtolower(str_replace("-", "_", trim($type)));
-		return in_array($type, ["none", "emote", "arm_swing", "hurt", "critical_hit", "magic_critical"], true) ? $type : "none";
+		return in_array($type, ["none", "emote", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true) ? $type : "none";
 	}
 
 	private static function normalizeAnimationId(string $id) : string{
