@@ -14,8 +14,25 @@ use pocketmine\player\Player;
 use pocketmine\utils\Config;
 use pocketmine\utils\TextFormat;
 use pocketmine\entity\Location;
+use pocketmine\world\particle\BubbleParticle;
+use pocketmine\world\particle\CriticalParticle;
 use pocketmine\world\particle\EntityFlameParticle;
+use pocketmine\world\particle\ExplodeParticle;
+use pocketmine\world\particle\FlameParticle;
+use pocketmine\world\particle\HappyVillagerParticle;
+use pocketmine\world\particle\HeartParticle;
+use pocketmine\world\particle\LavaParticle;
+use pocketmine\world\particle\Particle;
+use pocketmine\world\particle\PortalParticle;
+use pocketmine\world\particle\SmokeParticle;
+use pocketmine\world\particle\SplashParticle;
+use pocketmine\world\particle\WaterParticle;
 use pocketmine\world\sound\ClickSound;
+use pocketmine\world\sound\DoorBumpSound;
+use pocketmine\world\sound\ExplodeSound;
+use pocketmine\world\sound\PopSound;
+use pocketmine\world\sound\Sound;
+use pocketmine\world\sound\TotemUseSound;
 use pocketmine\Server;
 use NhanAZ\NPC\Main;
 use function atan2;
@@ -127,7 +144,7 @@ final class NpcManager{
 				$this->rotateTowardsNearestPlayer($entity);
 			}
 			if($definition->isParticleEnabled()){
-				$entity->getWorld()->addParticle($entity->getPosition()->add(0, 1.8, 0), new EntityFlameParticle());
+				$entity->getWorld()->addParticle($entity->getPosition()->add(0, 1.8, 0), $this->createParticle($definition->getParticleType()));
 			}
 		}
 	}
@@ -230,6 +247,32 @@ final class NpcManager{
 		$definition->setLines($lines);
 		$this->save();
 		$this->refresh($id);
+		return true;
+	}
+
+	public function setEffectType(string $id, string $field, string $type) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		$type = strtolower(str_replace("-", "_", trim($type)));
+		if($definition === null){
+			return false;
+		}
+		switch($field){
+			case "particle":
+				if(!in_array($type, ["bubble", "critical", "entity_flame", "explode", "flame", "happy_villager", "heart", "lava", "portal", "smoke", "splash", "water"], true)){
+					return false;
+				}
+				$definition->setParticleType($type);
+				break;
+			case "sound":
+				if(!in_array($type, ["click", "door_bump", "explode", "pop", "totem"], true)){
+					return false;
+				}
+				$definition->setSoundType($type);
+				break;
+			default:
+				return false;
+		}
+		$this->save();
 		return true;
 	}
 
@@ -402,7 +445,7 @@ final class NpcManager{
 		$this->cooldowns[$definition->getId()][$playerKey] = $now;
 
 		if($definition->isSoundEnabled()){
-			$entity->getWorld()->addSound($entity->getPosition(), new ClickSound(), [$player]);
+			$entity->getWorld()->addSound($entity->getPosition(), $this->createSound($definition->getSoundType()), [$player]);
 		}
 		$this->executeCommands($definition, $player);
 	}
@@ -426,7 +469,7 @@ final class NpcManager{
 		foreach($this->definitions as $id => $definition){
 			$entity = $this->entities[$id] ?? null;
 			$lines[] = sprintf(
-				"%s: world=%s entity=%s lines=%d actions=%d equipment=%d skin=%s cooldown=%.2f",
+				"%s: world=%s entity=%s lines=%d actions=%d equipment=%d skin=%s cooldown=%.2f particle=%s sound=%s",
 				$id,
 				$definition->getWorld(),
 				$entity !== null && !$entity->isClosed() ? "yes" : "no",
@@ -434,7 +477,9 @@ final class NpcManager{
 				count($definition->getCommands()),
 				count($definition->getEquipment()),
 				$definition->getSkinFile() === "" ? "default" : $definition->getSkinFile(),
-				$definition->getCooldown()
+				$definition->getCooldown(),
+				$definition->getParticleType(),
+				$definition->getSoundType()
 			);
 		}
 		return $lines;
@@ -574,6 +619,33 @@ final class NpcManager{
 		}
 		$result = (\Closure::fromCallable([$target, $method]))(...$arguments);
 		return is_int($result) || is_float($result) || is_string($result) ? $result : null;
+	}
+
+	private function createParticle(string $type) : Particle{
+		return match($type){
+			"bubble" => new BubbleParticle(),
+			"critical" => new CriticalParticle(),
+			"entity_flame" => new EntityFlameParticle(),
+			"explode" => new ExplodeParticle(),
+			"happy_villager" => new HappyVillagerParticle(),
+			"heart" => new HeartParticle(),
+			"lava" => new LavaParticle(),
+			"portal" => new PortalParticle(),
+			"smoke" => new SmokeParticle(),
+			"splash" => new SplashParticle(),
+			"water" => new WaterParticle(),
+			default => new FlameParticle()
+		};
+	}
+
+	private function createSound(string $type) : Sound{
+		return match($type){
+			"door_bump" => new DoorBumpSound(),
+			"explode" => new ExplodeSound(),
+			"pop" => new PopSound(),
+			"totem" => new TotemUseSound(),
+			default => new ClickSound()
+		};
 	}
 
 	private function loadSkin(NpcDefinition $definition) : Skin{

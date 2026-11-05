@@ -35,8 +35,13 @@ if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRot
 
 $roundTrip->setScale(9.0);
 $roundTrip->setLocation("lobby", 1.5, 70.0, -2.5, 90.0, 0.0);
+$roundTrip->setParticleType("happy-villager");
+$roundTrip->setSoundType("door-bump");
 if($roundTrip->getScale() !== 4.0 || $roundTrip->getWorld() !== "lobby" || $roundTrip->getX() !== 1.5 || $roundTrip->getYaw() !== 90.0){
 	throw new RuntimeException("NpcDefinition location and scale mutation failed");
+}
+if($roundTrip->getParticleType() !== "happy_villager" || $roundTrip->getSoundType() !== "door_bump"){
+	throw new RuntimeException("NpcDefinition effect type normalization failed");
 }
 
 try{

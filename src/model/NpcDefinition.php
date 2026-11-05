@@ -18,6 +18,8 @@ use function min;
 use function preg_match;
 use function str_contains;
 use function str_starts_with;
+use function str_replace;
+use function strtolower;
 use function trim;
 
 final class NpcDefinition{
@@ -54,7 +56,9 @@ final class NpcDefinition{
 		private string $skinFile = "",
 		private string $capeFile = "",
 		private string $geometryName = "",
-		private string $geometryData = ""
+		private string $geometryData = "",
+		private string $particleType = "flame",
+		private string $soundType = "click"
 	){
 		self::validateId($id);
 		$this->lines = self::normalizeLines($lines);
@@ -89,7 +93,9 @@ final class NpcDefinition{
 			self::stringValue($data, "skin", ""),
 			self::stringValue($data, "cape", ""),
 			self::stringValue($data, "geometry-name", ""),
-			self::stringValue($data, "geometry-data", "")
+			self::stringValue($data, "geometry-data", ""),
+			self::stringValue($data, "particle-type", "flame"),
+			self::stringValue($data, "sound-type", "click")
 		);
 	}
 
@@ -113,7 +119,9 @@ final class NpcDefinition{
 			"skin" => $this->skinFile,
 			"cape" => $this->capeFile,
 			"geometry-name" => $this->geometryName,
-			"geometry-data" => $this->geometryData
+			"geometry-data" => $this->geometryData,
+			"particle-type" => $this->particleType,
+			"sound-type" => $this->soundType
 		];
 	}
 
@@ -139,6 +147,8 @@ final class NpcDefinition{
 	public function getCapeFile() : string{ return $this->capeFile; }
 	public function getGeometryName() : string{ return $this->geometryName; }
 	public function getGeometryData() : string{ return $this->geometryData; }
+	public function getParticleType() : string{ return $this->particleType; }
+	public function getSoundType() : string{ return $this->soundType; }
 
 	/** @param array<int|string, mixed> $lines */
 	public function setLines(array $lines) : void{ $this->lines = self::normalizeLines($lines); }
@@ -177,6 +187,8 @@ final class NpcDefinition{
 		$this->geometryName = self::normalizeGeometryName($name);
 		$this->geometryData = self::normalizeGeometryData($data);
 	}
+	public function setParticleType(string $type) : void{ $this->particleType = self::normalizeEffectName($type, "flame"); }
+	public function setSoundType(string $type) : void{ $this->soundType = self::normalizeEffectName($type, "click"); }
 
 	private static function validateId(string $id) : void{
 		if(preg_match('/^[A-Za-z0-9._-]{1,32}$/D', $id) !== 1){
@@ -258,6 +270,11 @@ final class NpcDefinition{
 
 	private static function normalizeGeometryData(string $data) : string{
 		return strlen($data) <= 65536 ? $data : "";
+	}
+
+	private static function normalizeEffectName(string $name, string $default) : string{
+		$name = strtolower(str_replace("-", "_", trim($name)));
+		return preg_match('/^[a-z0-9_]{1,32}$/D', $name) === 1 ? $name : $default;
 	}
 
 	private static function normalizeCooldown(float $cooldown) : float{

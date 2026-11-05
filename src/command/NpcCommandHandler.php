@@ -47,6 +47,8 @@ final class NpcCommandHandler{
 			case "skin": return $this->skin($sender, $args);
 			case "cooldown": return $this->cooldown($sender, $args);
 			case "scale": return $this->scale($sender, $args);
+			case "particle-type": return $this->effectType($sender, "particle", $args);
+			case "sound-type": case "hitsound": return $this->effectType($sender, "sound", $args);
 			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
 			case "tp": return $this->teleport($sender, $args);
 			case "reload": $this->manager->reload(); $sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded."); return true;
@@ -93,6 +95,8 @@ final class NpcCommandHandler{
 			"/npc skin <id> <relative-raw-skin-file|clear>",
 			"/npc cooldown <id> <seconds>",
 			"/npc scale <id> <size>",
+			"/npc particle-type <id> <flame|heart|smoke|...>",
+			"/npc sound-type <id> <click|pop|door_bump|...>",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc debug | /npc reload"
 		] as $line){
@@ -347,6 +351,19 @@ final class NpcCommandHandler{
 		}
 		$ok = $this->manager->setCooldown($id, (float) $seconds);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC cooldown updated." : TextFormat::RED . "NPC not found."); return true;
+	}
+
+	/** @param list<string> $args */
+	private function effectType(CommandSender $sender, string $field, array $args) : bool{
+		$id = array_shift($args);
+		$type = strtolower(trim(array_shift($args) ?? ""));
+		if($id === null || $type === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc " . ($field === "particle" ? "particle-type" : "sound-type") . " <id> <type>");
+			return true;
+		}
+		$ok = $this->manager->setEffectType($id, $field, $type);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC " . $field . " type updated." : TextFormat::RED . "NPC or effect type is invalid.");
+		return true;
 	}
 
 	/** @param list<string> $args */

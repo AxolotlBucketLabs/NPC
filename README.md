@@ -14,7 +14,7 @@ The first deployable milestone includes:
 - command actions, including trusted `console:` actions;
 - per-player interaction cooldowns;
 - optional look-at-nearest-player rotation;
-- optional flame particles and click sound;
+- optional configurable particles and hit sounds (with flame/click defaults);
 - local raw RGBA skin/cape files with path confinement and size validation;
 - basic hand and armor equipment from PocketMine item aliases;
 - `{npc}`, `{world}`, `{online}`, `{players}` and `{display_name}` placeholders;
@@ -42,6 +42,8 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc skin <id> <relative-raw-skin-file|player|clear>
 /npc cooldown <id> <seconds>
 /npc scale <id> <size>
+/npc particle-type <id> <type>
+/npc sound-type <id> <type>
 /npc rotate <id> <on|off>
 /npc particle <id> <on|off>
 /npc sound <id> <on|off>
@@ -73,7 +75,9 @@ npcs:
     cooldown: 2
     rotate: true
     particle: false
+    particle-type: flame
     sound: true
+    sound-type: click
     scale: 1
     equipment:
       hand: iron_sword
@@ -83,6 +87,8 @@ npcs:
 Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, or 128x128 RGBA file under `plugin_data/NPC/skins/`, then run `/npc skin <id> <relative-file>`. From in-game, `/npc skin <id> player` (or the old `/slapper edit <id> skin`) copies the executing player's validated skin, cape, and geometry into that local directory. Cape files must be exactly 8192 bytes and can be set in YAML with the `cape` field. The plugin does not download or follow skin URLs.
 
 Player-specific integration placeholders are expanded for click actions. Nametags remain shared entity metadata, so `{online}` and `{players}` are suitable for persistent nametags while `{rank}` and `{balance}` are intended for action commands unless a future per-viewer nametag layer is enabled.
+
+Supported particle types are `flame`, `entity_flame`, `heart`, `critical`, `smoke`, `explode`, `portal`, `happy_villager`, `bubble`, `splash`, `water`, and `lava`. Supported hit sounds are `click`, `pop`, `door_bump`, `explode`, and `totem`. Unknown values fall back safely to the default effect instead of dynamically loading a class.
 
 ## Slapper command compatibility
 
@@ -96,6 +102,8 @@ The `/slapper` command alias accepts the historical Human/Player workflow withou
 /slapper edit <id> listcommands
 /slapper edit <id> helmet|chestplate|leggings|boots|hand <item|clear>
 /slapper edit <id> scale <size>
+/npc particle-type <id> <type>
+/npc sound-type <id> <type>
 /slapper edit <id> tphere
 /slapper edit <id> tpto
 ```
