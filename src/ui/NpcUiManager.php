@@ -19,10 +19,15 @@ use dktapps\pmforms\element\Label;
 use dktapps\pmforms\element\Toggle;
 use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
+use function array_filter;
 use function array_merge;
+use function array_slice;
+use function array_values;
+use function ceil;
 use function count;
 use function in_array;
 use function is_numeric;
+use function str_contains;
 use function strtolower;
 use function trim;
 
@@ -37,6 +42,7 @@ final class NpcUiManager{
 			[
 				new MenuOption("Create NPC"),
 				new MenuOption("List NPCs"),
+				new MenuOption("Browse Entity Types (Vanilla icons)"),
 				new MenuOption("Browse Emotes"),
 				new MenuOption("Migrate Slapper")
 			],
@@ -44,8 +50,9 @@ final class NpcUiManager{
 				switch($selected){
 					case 0: $this->openCreate($player); break;
 					case 1: $this->openList($player); break;
-					case 2: $this->openEmoteSearch($player); break;
-					case 3: $this->openMigration($player); break;
+					case 2: $this->openEntitySearch($player); break;
+					case 3: $this->openEmoteSearch($player); break;
+					case 4: $this->openMigration($player); break;
 				}
 			},
 			static function(Player $player) : void{}
@@ -62,31 +69,135 @@ final class NpcUiManager{
 			"Create NPC",
 			[
 				new Input("id", "Stable NPC ID", "welcome"),
-				new Input("name", "Nametag", "Welcome NPC"),
-				new Input("type", "Entity type", "human, bee, zombie...", "human")
+				new Input("name", "Nametag", "Welcome NPC")
 			],
 			function(Player $player, CustomFormResponse $response) : void{
 				$id = trim($response->getString("id"));
 				$name = trim($response->getString("name"));
-				$type = strtolower(trim($response->getString("type")));
 				if($id === ""){
 					$player->sendMessage(TextFormat::RED . "NPC ID cannot be empty.");
 					return;
 				}
-				if(VanillaMobCatalog::resolve($type) === null){
-					$player->sendMessage(TextFormat::RED . "Unknown entity type. Use /npc entities in chat.");
-					return;
-				}
 				try{
 					$this->manager->create($player, $id, $name);
-					$this->manager->setEntityType($id, $type);
 					$player->sendMessage(TextFormat::GREEN . "NPC '$id' created.");
-					$this->openEdit($player, $id);
+					$this->openEntityResults($player, $id, "", 0);
 				}catch(\Throwable $error){
 					$player->sendMessage(TextFormat::RED . $error->getMessage());
 				}
 			},
 			static function(Player $player) : void{}
+		));
+	}
+
+	private function openEntitySearch(Player $player, ?string $npcId = null) : void{
+		$title = $npcId === null ? "Browse entity types" : "Choose entity type: " . $npcId;
+		$player->sendForm(new CustomForm(
+			$title,
+			[
+				new Label("info", "Vanilla spawn-egg/block icons are resolved from the Bedrock resource pack."),
+				new Input("query", "Search entity", "zombie, golem, falling...", ""),
+				new Input("page", "Page", "1", "1")
+			],
+			function(Player $player, CustomFormResponse $response) use ($npcId) : void{
+				$query = trim($response->getString("query"));
+				$page = is_numeric($response->getString("page")) ? max(1, (int) $response->getString("page")) : 1;
+				$this->openEntityResults($player, $npcId, $query, $page - 1);
+			},
+			function(Player $player) use ($npcId) : void{
+				if($npcId === null){
+					$this->openMain($player);
+				}else{
+					$this->openEdit($player, $npcId);
+				}
+			}
+		));
+	}
+
+	private function openEntityResults(Player $player, ?string $npcId, string $query, int $page) : void{
+		$types = VanillaMobCatalog::all();
+		$normalizedQuery = strtolower(trim($query));
+		if($normalizedQuery !== ""){
+			$types = array_values(array_filter(
+				$types,
+				static fn(string $type) : bool => str_contains($type, $normalizedQuery) || str_contains(strtolower(VanillaMobCatalog::displayName($type)), $normalizedQuery)
+			));
+		}
+
+		$pageSize = 20;
+		$pageCount = max(1, (int) ceil(count($types) / $pageSize));
+		$page = min(max(0, $page), $pageCount - 1);
+		$offset = $page * $pageSize;
+		$pageTypes = array_slice($types, $offset, $pageSize);
+		$options = [new MenuOption("Back"), new MenuOption("Search again")];
+		$actions = ["back", "search"];
+		if($page > 0){
+			$options[] = new MenuOption("Previous page");
+			$actions[] = "previous";
+		}
+		foreach($pageTypes as $type){
+			$options[] = new MenuOption(
+				VanillaMobCatalog::displayName($type) . "\n" . $type,
+				new FormIcon(VanillaMobCatalog::iconPath($type), FormIcon::IMAGE_TYPE_PATH)
+			);
+			$actions[] = "entity:" . $type;
+		}
+		if($page + 1 < $pageCount){
+			$options[] = new MenuOption("Next page");
+			$actions[] = "next";
+		}
+
+		$target = $npcId === null ? "" : " for " . $npcId;
+		$description = "Select an entity" . $target . ".\n" . count($types) . " result(s), page " . ($page + 1) . "/" . $pageCount;
+		if($normalizedQuery !== ""){
+			$description .= "\nSearch: " . $query;
+		}
+		$player->sendForm(new MenuForm(
+			"Entity types" . $target,
+			$description,
+			$options,
+			function(Player $player, int $selected) use ($actions, $npcId, $query, $page) : void{
+				$action = $actions[$selected] ?? "back";
+				switch($action){
+					case "back":
+						if($npcId === null){
+							$this->openMain($player);
+						}else{
+							$this->openEdit($player, $npcId);
+						}
+						return;
+					case "search":
+						$this->openEntitySearch($player, $npcId);
+						return;
+					case "previous":
+						$this->openEntityResults($player, $npcId, $query, max(0, $page - 1));
+						return;
+					case "next":
+						$this->openEntityResults($player, $npcId, $query, $page + 1);
+						return;
+				}
+				if(str_starts_with($action, "entity:")){
+					$type = substr($action, 7);
+					if($npcId === null){
+						$player->sendMessage(TextFormat::GREEN . VanillaMobCatalog::displayName($type) . TextFormat::GRAY . " => " . VanillaMobCatalog::iconPath($type));
+						$this->openEntityResults($player, null, $query, $page);
+						return;
+					}
+					if($this->manager->setEntityType($npcId, $type)){
+						$player->sendMessage(TextFormat::GREEN . "NPC entity type updated to " . VanillaMobCatalog::displayName($type) . ".");
+					}else{
+						$player->sendMessage(TextFormat::RED . "NPC not found.");
+					}
+					$this->openEdit($player, $npcId);
+				}
+			},
+			function(Player $player) use ($npcId) : void{
+				if($npcId === null){
+					$this->openMain($player);
+				}else{
+					$this->openEdit($player, $npcId);
+				}
+			}
 		));
 	}
 
@@ -122,6 +233,7 @@ final class NpcUiManager{
 			"Choose what to edit.",
 			[
 				new MenuOption("Basic settings"),
+				new MenuOption("Entity type (Vanilla icons)"),
 				new MenuOption("Player emotes (with images)"),
 				new MenuOption("Actions"),
 				new MenuOption("Equipment"),
@@ -131,11 +243,12 @@ final class NpcUiManager{
 			function(Player $player, int $selected) use ($id) : void{
 				switch($selected){
 					case 0: $this->openBasic($player, $id); break;
-					case 1: $this->openEmoteSearch($player, $id); break;
-					case 2: $this->openActions($player, $id); break;
-					case 3: $this->openEquipment($player, $id); break;
-					case 4: $this->openDelete($player, $id); break;
-					case 5: $this->openList($player); break;
+					case 1: $this->openEntitySearch($player, $id); break;
+					case 2: $this->openEmoteSearch($player, $id); break;
+					case 3: $this->openActions($player, $id); break;
+					case 4: $this->openEquipment($player, $id); break;
+					case 5: $this->openDelete($player, $id); break;
+					case 6: $this->openList($player); break;
 				}
 			},
 			static function(Player $player) : void{}

@@ -186,6 +186,29 @@ final class VanillaMobCatalog{
 	}
 
 	/**
+	 * Returns a texture path understood by Bedrock form icons.
+	 *
+	 * These paths are resolved by the client against its loaded Vanilla
+	 * resource pack. They are deliberately not URLs: no image needs to be
+	 * downloaded by the server or copied into the PHAR.
+	 */
+	public static function iconPath(string $type) : string{
+		$type = self::resolve($type) ?? "";
+		return match($type){
+			"falling_block" => "textures/blocks/stone",
+			"human" => "textures/items/egg_npc",
+			"evocation_illager" => "textures/items/spawn_eggs/spawn_egg_evoker",
+			"villager_v2" => "textures/items/spawn_eggs/spawn_egg_villager",
+			"zombie_pigman" => "textures/items/spawn_eggs/spawn_egg_zombified_piglin",
+			"zombie_villager_v2" => "textures/items/spawn_eggs/spawn_egg_zombie_villager",
+			"" => "textures/items/egg",
+			default => isset(self::$types[$type])
+				? "textures/items/spawn_eggs/spawn_egg_" . $type
+				: "textures/items/egg"
+		};
+	}
+
+	/**
 	 * Registers a passive custom visual actor. This does not load PHP classes or
 	 * execute external code; the caller only supplies a Bedrock network ID.
 	 */

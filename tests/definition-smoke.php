@@ -39,6 +39,9 @@ if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 ||
 if(count(VanillaMobCatalog::all()) < 90 || VanillaMobCatalog::resolve("minecraft:zombie") !== "zombie" || VanillaMobCatalog::networkId("allay") !== "minecraft:allay" || VanillaMobCatalog::resolve("falling_block") !== "falling_block"){
 	throw new RuntimeException("Vanilla entity catalog is incomplete");
 }
+if(VanillaMobCatalog::iconPath("bee") !== "textures/items/spawn_eggs/spawn_egg_bee" || VanillaMobCatalog::iconPath("evoker") !== "textures/items/spawn_eggs/spawn_egg_evoker" || VanillaMobCatalog::iconPath("falling_block") !== "textures/blocks/stone" || VanillaMobCatalog::iconPath("unknown-custom") !== "textures/items/egg"){
+	throw new RuntimeException("Vanilla form icon paths are invalid");
+}
 $definition->setInteractionMode("separate");
 $definition->setHitCommands(["message:hit"]);
 $definition->setInteractCommands(["message:interact"]);

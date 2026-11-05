@@ -27,6 +27,7 @@ The first deployable milestone includes:
 - Slapper Human `menuname` compatibility using the current Axolotl-PM player-list packet API;
 - edit aliases for names, commands, hand/armor equipment, scale, reload, and teleporting an NPC or player;
 - `/npc ui`, a PMForms-backed operator GUI for creating, editing, importing and deleting NPCs;
+- a paginated/searchable entity picker with Vanilla `IMAGE_TYPE_PATH` icons: mob spawn eggs, the NPC egg for Human, and a stone block icon for FallingBlock;
 - Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click event triggers;
 - every current Vanilla Bedrock mob network type from Axolotl-PM's entity catalog, plus passive `falling_block`/FallingSand actors;
 - a safe custom visual-entity registry through `Main::registerEntityType()` without arbitrary PHP class loading;
@@ -138,13 +139,15 @@ Raw skins remain local and are still the most deterministic option. Place a 64x3
 
 ## Operator UI
 
-`/npc ui` opens the operator menu built with the `pmforms` virion. The menu can create an NPC, edit its name/type/skin/effects/animation, browse the emote catalog, select an emote from an image-backed paginated menu, configure player counts/walking/random emotes, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. Sneak-right-clicking an NPC as an operator opens its editor directly. Emote result buttons show the official 128x128 thumbnail from the Bedrock-Emotes image repository; only the URL is sent in the form, so the PNGs are not copied into `NPC.phar`. DevTools prepares PMForms from the pinned `NhanAZ-Libraries/pmforms` Composer source and packages it into `NPC.phar`; a separate forms plugin is not required at runtime.
+`/npc ui` opens the operator menu built with the `pmforms` virion. The menu can create an NPC, choose its entity type from a searchable paginated Vanilla-icon picker, edit its name/type/skin/effects/animation, browse the emote catalog, select an emote from an image-backed paginated menu, configure player counts/walking/random emotes, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. Sneak-right-clicking an NPC as an operator opens its editor directly. Entity buttons use Bedrock `FormIcon::IMAGE_TYPE_PATH`, so the client resolves Vanilla spawn-egg/block textures from its loaded resource pack without a CDN. Emote result buttons show the official 128x128 thumbnail from the Bedrock-Emotes image repository; only the URL is sent in the form, so the PNGs are not copied into `NPC.phar`. DevTools prepares PMForms from the pinned `NhanAZ-Libraries/pmforms` Composer source and packages it into `NPC.phar`; a separate forms plugin is not required at runtime.
 
 The GUI is permission-gated by `npc.admin`. It is a control surface for trusted operators, not a player-facing NPC interaction menu.
 
 ## Entity types, emotes and animations
 
 Human is the default and supports local/remote skins, cape/geometry data, equipment, player-list menu names, and player emotes. Every Vanilla mob in the current Bedrock entity ID table is available as a passive visual actor (`zombie`, `allay`, `camel`, `warden`, `happy_ghast`, and so on); `/npc entities` prints the exact catalog. These are visual actors, not native mob AI: they do not pathfind, attack, breed, drop loot, or persist as world entities. `falling_block` is a passive block actor and reads its visual from `block-id: stone` (or any valid PocketMine item/block alias). Skins/equipment/player-list menu names apply only to Human actors. `animation-type: fly` remains a visual hover/orbit state for the flying display types, not native AI.
+
+The UI entity picker uses client-side Vanilla resource-pack paths rather than remote image URLs. Most current mobs use `textures/items/spawn_eggs/spawn_egg_<entity>`, while compatibility aliases use their Vanilla paths (`egg_npc`, `spawn_egg_evoker`, `spawn_egg_zombified_piglin`, and so on). Human uses the Vanilla NPC egg icon and `falling_block` uses `textures/blocks/stone`. The selected path is only an icon; it does not change the passive actor implementation or add mob AI. A custom registered actor receives the generic Vanilla egg fallback unless its type is added to the catalog mapping.
 
 Player emotes, actor animations, and particles are separate controls:
 
