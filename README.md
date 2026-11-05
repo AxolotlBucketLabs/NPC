@@ -17,7 +17,10 @@ The first deployable milestone includes:
 - optional flame particles and click sound;
 - local raw RGBA skin/cape files with path confinement and size validation;
 - basic hand and armor equipment from PocketMine item aliases;
-- `{npc}`, `{world}`, `{online}` and `{players}` placeholders in nametags;
+- `{npc}`, `{world}`, `{online}`, `{players}` and `{display_name}` placeholders;
+- `{prefix}` and `{suffix}` when PureChat is installed;
+- `{rank}` when PurePerms is installed;
+- `{balance}`, `{money}` and `{coins}` when SimpleEconomy, EcoAPI, TownCoins, or TownEconomy exposes a compatible scalar getter;
 - `/slapper` as a command alias and a guarded `/rca <player> <command>` compatibility command;
 - DevTools PHAR packaging and PHPStan Level Max in CI.
 
@@ -74,11 +77,13 @@ npcs:
 
 Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, or 128x128 RGBA file under `plugin_data/NPC/skins/`, then run `/npc skin <id> <relative-file>`. Cape files must be exactly 8192 bytes and can be set in YAML with the `cape` field. The plugin does not download or follow skin URLs.
 
+Player-specific integration placeholders are expanded for click actions. Nametags remain shared entity metadata, so `{online}` and `{players}` are suitable for persistent nametags while `{rank}` and `{balance}` are intended for action commands unless a future per-viewer nametag layer is enabled.
+
 ## Compatibility boundary
 
 The core deliberately has no hard dependency on PureChat, PurePerms, ScoreHud, EcoAPI, SimpleEconomy, TownCoins, or TownEconomy. This lets it load when those plugins are absent and avoids coupling NPC persistence to another plugin's storage format.
 
-The current milestone exposes only generic placeholders. Dedicated adapters for rank, economy, skin/geometry, forms, migration from old Slapper data, equipment, and addon parity are the next implementation phase. Until those adapters are implemented and tested, this README does not claim full replacement compatibility with the historical Slapper extensions.
+The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. Dedicated typed adapters, ScoreHud tag registration, forms, migration from old Slapper data, and full addon parity still require separate integration tests. Until those tests exist, this README does not claim full replacement compatibility with every historical Slapper extension.
 
 The old Slapper repositories and Poggit Archive pages supplied for this project are treated as feature references only. No source code has been copied into this implementation; license and API behavior will be reviewed separately for each future adapter.
 
