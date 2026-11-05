@@ -1,0 +1,14 @@
+name: PmFormsDevToolsConsumer
+main: NhanAZ\PmFormsDevToolsConsumer\Main
+version: 1.0.0
+api: "5.0.0"
+description: pmforms demo plugin and DevTools consumer fixture
+commands:
+  form:
+    description: Opens one of the pmforms examples
+    usage: "/form <modal|menu|custom> [players ...]"
+    permission: pmforms.command
+permissions:
+  pmforms.command:
+    default: true
+    description: Allows the use of /form

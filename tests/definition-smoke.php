@@ -24,12 +24,15 @@ $definition = new NpcDefinition(
 	["hand" => "iron_sword", "helmet" => "iron_helmet"]
 );
 
-if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 || $definition->getCooldown() !== 2.0){
+$definition->setEntityType("bee");
+$definition->setAnimation("emote", "wave", 20, "right-click");
+
+if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 || $definition->getCooldown() !== 2.0 || $definition->getEntityType() !== "bee" || $definition->getAnimationType() !== "emote" || $definition->getAnimationId() !== "wave" || $definition->getAnimationInterval() !== 20 || $definition->getAnimationTrigger() !== "right_click"){
 	throw new RuntimeException("NpcDefinition basic state is invalid");
 }
 
 $roundTrip = NpcDefinition::fromArray("welcome", $definition->toArray());
-if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRotateEnabled() || $roundTrip->getEquipment()["hand"] !== "iron_sword"){
+if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRotateEnabled() || $roundTrip->getEquipment()["hand"] !== "iron_sword" || $roundTrip->getEntityType() !== "bee" || $roundTrip->getAnimationType() !== "emote" || $roundTrip->getAnimationTrigger() !== "right_click"){
 	throw new RuntimeException("NpcDefinition round trip failed");
 }
 

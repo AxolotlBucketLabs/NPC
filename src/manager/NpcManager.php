@@ -5,10 +5,17 @@ declare(strict_types=1);
 namespace NhanAZ\NPC\manager;
 
 use NhanAZ\NPC\entity\NpcEntity;
+use NhanAZ\NPC\entity\MobNpcEntity;
 use NhanAZ\NPC\model\NpcDefinition;
 use pocketmine\console\ConsoleCommandSender;
+use pocketmine\entity\Entity;
 use pocketmine\entity\Human;
+use pocketmine\entity\Living;
 use pocketmine\entity\Skin;
+use pocketmine\entity\animation\ArmSwingAnimation;
+use pocketmine\entity\animation\CriticalHitAnimation;
+use pocketmine\entity\animation\HurtAnimation;
+use pocketmine\entity\animation\MagicHitAnimation;
 use pocketmine\event\player\PlayerEntityInteractEvent;
 use pocketmine\item\StringToItemParser;
 use pocketmine\player\Player;
@@ -64,7 +71,7 @@ final class NpcManager{
 	/** @var array<string, NpcDefinition> */
 	private array $definitions = [];
 
-	/** @var array<string, NpcEntity> */
+	/** @var array<string, NpcEntity|MobNpcEntity> */
 	private array $entities = [];
 
 	/** @var array<string, array<string, float>> */
@@ -135,10 +142,6 @@ final class NpcManager{
 
 	public function tick() : void{
 		$tick = $this->plugin->getServer()->getTick();
-		if($tick % 10 !== 0){
-			return;
-		}
-
 		foreach($this->definitions as $id => $definition){
 			$entity = $this->entities[$id] ?? null;
 			if($entity === null || $entity->isClosed()){
@@ -149,6 +152,13 @@ final class NpcManager{
 				continue;
 			}
 
+			if($definition->getAnimationTrigger() === "timer" && $tick % $definition->getAnimationInterval() === 0){
+				$this->playAnimation($entity, $definition);
+			}
+
+			if($tick % 10 !== 0){
+				continue;
+			}
 			$entity->setNameTag($this->renderLines($definition));
 			if($definition->isRotateEnabled()){
 				$this->rotateTowardsNearestPlayer($entity);
@@ -204,7 +214,8 @@ final class NpcManager{
 		return $removed;
 	}
 
-	public function spawn(NpcDefinition $definition) : ?NpcEntity{
+	/** @return NpcEntity|MobNpcEntity|null */
+	public function spawn(NpcDefinition $definition) : NpcEntity|MobNpcEntity|null{
 		$world = $this->plugin->getServer()->getWorldManager()->getWorldByName($definition->getWorld());
 		if($world === null){
 			$this->plugin->getLogger()->warning("World '" . $definition->getWorld() . "' for NPC '" . $definition->getId() . "' is not loaded");
@@ -222,13 +233,20 @@ final class NpcManager{
 			$definition->getYaw(),
 			$definition->getPitch()
 		);
-		$entity = new NpcEntity($location, $definition->getId(), $this->loadSkin($definition), $definition->getMenuName());
+		$entity = $definition->getEntityType() === "bee"
+			? new MobNpcEntity($location, $definition->getId(), "minecraft:bee")
+			: new NpcEntity($location, $definition->getId(), $this->loadSkin($definition), $definition->getMenuName());
 		$entity->setScale($definition->getScale());
-		$this->applyEquipment($entity, $definition);
+		if($entity instanceof NpcEntity){
+			$this->applyEquipment($entity, $definition);
+		}
 		$entity->setNameTag($this->renderLines($definition));
 		$entity->setNameTagVisible(true);
 		$entity->setNameTagAlwaysVisible(true);
 		$this->entities[$definition->getId()] = $entity;
+		if($definition->getAnimationTrigger() === "spawn"){
+			$this->playAnimation($entity, $definition);
+		}
 		return $entity;
 	}
 
@@ -293,9 +311,30 @@ final class NpcManager{
 		}
 		$definition->setMenuName($menuName);
 		$entity = $this->entities[$id] ?? null;
-		if($entity !== null && !$entity->isClosed()){
+		if($entity instanceof NpcEntity && !$entity->isClosed()){
 			$entity->setMenuName($definition->getMenuName());
 		}
+		$this->save();
+		return true;
+	}
+
+	public function setEntityType(string $id, string $entityType) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !in_array(strtolower($entityType), ["human", "player", "bee"], true)){
+			return false;
+		}
+		$definition->setEntityType($entityType);
+		$this->save();
+		$this->respawn($id);
+		return true;
+	}
+
+	public function setAnimation(string $id, string $type, string $animationId = "", int $interval = 100, string $trigger = "timer") : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !in_array(strtolower(str_replace("-", "_", $type)), ["none", "emote", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
+			return false;
+		}
+		$definition->setAnimation($type, $animationId, $interval, $trigger);
 		$this->save();
 		return true;
 	}
@@ -342,7 +381,7 @@ final class NpcManager{
 
 	public function setSkinFile(string $id, string $file) : bool{
 		$definition = $this->definitions[$id] ?? null;
-		if($definition === null){
+		if($definition === null || $definition->getEntityType() === "bee"){
 			return false;
 		}
 		$definition->setSkinFile($file);
@@ -353,7 +392,7 @@ final class NpcManager{
 
 	public function setSkinFromPlayer(Player $player, string $id) : bool{
 		$definition = $this->definitions[$id] ?? null;
-		if($definition === null){
+		if($definition === null || $definition->getEntityType() === "bee"){
 			return false;
 		}
 		$stored = $this->persistSkin($player->getSkin(), $id);
@@ -565,14 +604,14 @@ final class NpcManager{
 
 	public function handleInteract(PlayerEntityInteractEvent $event) : void{
 		$entity = $event->getEntity();
-		if(!$entity instanceof NpcEntity || !isset($this->entities[$entity->getNpcId()])){
+		if(!($entity instanceof NpcEntity || $entity instanceof MobNpcEntity) || !isset($this->entities[$entity->getNpcId()])){
 			return;
 		}
 		$event->cancel();
-		$this->handleInteraction($entity, $event->getPlayer());
+		$this->handleInteraction($entity, $event->getPlayer(), "right_click");
 	}
 
-	public function handleHit(NpcEntity $entity, Player $player) : void{
+	public function handleHit(NpcEntity|MobNpcEntity $entity, Player $player) : void{
 		if(!isset($this->entities[$entity->getNpcId()])){
 			return;
 		}
@@ -588,7 +627,7 @@ final class NpcManager{
 			$player->sendMessage(TextFormat::GREEN . "NPC ID: " . $entity->getNpcId() . " (entity ID: " . $entity->getId() . ")");
 			return;
 		}
-		$this->handleInteraction($entity, $player);
+		$this->handleInteraction($entity, $player, "left_click");
 	}
 
 	public function startIdSession(Player $player) : void{
@@ -610,7 +649,7 @@ final class NpcManager{
 		return $hadSession;
 	}
 
-	private function handleInteraction(NpcEntity $entity, Player $player) : void{
+	private function handleInteraction(NpcEntity|MobNpcEntity $entity, Player $player, string $trigger) : void{
 		$definition = $this->definitions[$entity->getNpcId()] ?? null;
 		if($definition === null){
 			return;
@@ -622,11 +661,77 @@ final class NpcManager{
 			return;
 		}
 		$this->cooldowns[$definition->getId()][$playerKey] = $now;
+		if($definition->getAnimationTrigger() === $trigger){
+			$this->playAnimation($entity, $definition);
+		}
 
 		if($definition->isSoundEnabled()){
 			$entity->getWorld()->addSound($entity->getPosition(), $this->createSound($definition->getSoundType()), [$player]);
 		}
 		$this->executeCommands($definition, $player);
+	}
+
+	private function playAnimation(Living $entity, NpcDefinition $definition) : void{
+		switch($definition->getAnimationType()){
+			case "emote":
+				if($entity instanceof NpcEntity && $definition->getAnimationId() !== ""){
+					$entity->emote($definition->getAnimationId());
+				}
+				break;
+			case "arm_swing":
+				$entity->broadcastAnimation(new ArmSwingAnimation($entity));
+				break;
+			case "hurt":
+				$entity->broadcastAnimation(new HurtAnimation($entity));
+				break;
+			case "critical_hit":
+				$entity->broadcastAnimation(new CriticalHitAnimation($entity));
+				break;
+			case "magic_critical":
+				$entity->broadcastAnimation(new MagicHitAnimation($entity));
+				break;
+		}
+	}
+
+	public function resolveScoreTag(Player $player, string $tag) : ?string{
+		$tag = strtolower(trim($tag, "{} "));
+		$world = $player->getWorld();
+		$actors = [];
+		foreach($this->entities as $id => $entity){
+			if(!$entity->isClosed() && $entity->getWorld() === $world){
+				$actors[$id] = $entity;
+			}
+		}
+		if($tag === "npc.count"){
+			return (string) count($actors);
+		}
+		if($tag === "npc.ids"){
+			return implode(",", array_keys($actors));
+		}
+		$nearestId = null;
+		$nearestEntity = null;
+		$nearestDistance = PHP_FLOAT_MAX;
+		foreach($actors as $id => $entity){
+			$distance = $player->getPosition()->distanceSquared($entity->getPosition());
+			if($distance < $nearestDistance){
+				$nearestId = $id;
+				$nearestEntity = $entity;
+				$nearestDistance = $distance;
+			}
+		}
+		if($nearestId === null || $nearestEntity === null){
+			return in_array($tag, ["npc.nearest_id", "npc.nearest_name", "npc.nearest_distance", "npc.nearest_entity_id", "npc.nearest_type", "npc.nearest_animation"], true) ? "" : null;
+		}
+		$definition = $this->definitions[$nearestId] ?? null;
+		return match($tag){
+			"npc.nearest_id" => $nearestId,
+			"npc.nearest_name" => $nearestEntity->getNameTag(),
+			"npc.nearest_distance" => sprintf("%.1f", sqrt($nearestDistance)),
+			"npc.nearest_entity_id" => (string) $nearestEntity->getId(),
+			"npc.nearest_type" => $definition?->getEntityType() ?? "",
+			"npc.nearest_animation" => $definition?->getAnimationType() ?? "none",
+			default => null
+		};
 	}
 
 	public function executeRca(Player $actor, string $command) : bool{
@@ -910,7 +1015,7 @@ final class NpcManager{
 		}
 	}
 
-	private function rotateTowardsNearestPlayer(NpcEntity $entity) : void{
+	private function rotateTowardsNearestPlayer(NpcEntity|MobNpcEntity $entity) : void{
 		$nearest = null;
 		$nearestDistance = 16.0 * 16.0;
 		foreach($entity->getWorld()->getPlayers() as $player){

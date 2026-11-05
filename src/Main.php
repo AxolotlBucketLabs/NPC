@@ -6,6 +6,8 @@ namespace NhanAZ\NPC;
 
 use NhanAZ\NPC\command\NpcCommandHandler;
 use NhanAZ\NPC\entity\NpcEntity;
+use NhanAZ\NPC\entity\MobNpcEntity;
+use NhanAZ\NPC\integration\ScoreHudIntegration;
 use NhanAZ\NPC\manager\NpcManager;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
@@ -30,10 +32,14 @@ final class Main extends PluginBase implements Listener{
 		$this->commandHandler = new NpcCommandHandler($this->npcManager);
 		$this->npcManager->load();
 		$this->npcManager->spawnAll();
+		ScoreHudIntegration::register($this, $this->npcManager);
 
 		$this->getServer()->getPluginManager()->registerEvents($this, $this);
 		$this->getScheduler()->scheduleRepeatingTask(new ClosureTask(function() : void{
 			$this->npcManager->tick();
+			if($this->getServer()->getTick() % 10 === 0){
+				ScoreHudIntegration::update($this, $this->npcManager);
+			}
 		}), 1);
 	}
 
@@ -53,7 +59,7 @@ final class Main extends PluginBase implements Listener{
 	}
 
 	public function onPlayerEntityInteract(PlayerEntityInteractEvent $event) : void{
-		if($event->getEntity() instanceof NpcEntity){
+		if($event->getEntity() instanceof NpcEntity || $event->getEntity() instanceof MobNpcEntity){
 			$this->npcManager->handleInteract($event);
 		}
 	}
@@ -63,10 +69,14 @@ final class Main extends PluginBase implements Listener{
 	 */
 	public function onEntityDamage(EntityDamageEvent $event) : void{
 		$entity = $event->getEntity();
-		if($entity instanceof NpcEntity){
+		if($entity instanceof NpcEntity || $entity instanceof MobNpcEntity){
 			$event->cancel();
 			if($event instanceof EntityDamageByEntityEvent && $event->getDamager() instanceof Player){
-				$this->npcManager->handleHit($entity, $event->getDamager());
+				if($entity instanceof MobNpcEntity){
+					$this->npcManager->handleHit($entity, $event->getDamager());
+				}elseif($entity instanceof NpcEntity){
+					$this->npcManager->handleHit($entity, $event->getDamager());
+				}
 			}
 		}
 	}

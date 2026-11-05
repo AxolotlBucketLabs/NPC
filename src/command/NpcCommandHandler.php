@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NhanAZ\NPC\command;
 
 use NhanAZ\NPC\manager\NpcManager;
+use NhanAZ\NPC\ui\NpcUiManager;
 use pocketmine\command\CommandSender;
 use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
@@ -18,13 +19,29 @@ use function strtolower;
 use function trim;
 
 final class NpcCommandHandler{
-	public function __construct(private NpcManager $manager){}
+	private NpcUiManager $ui;
+
+	public function __construct(private NpcManager $manager){
+		$this->ui = new NpcUiManager($manager);
+	}
 
 	/** @param list<string> $args */
 	public function handleNpc(CommandSender $sender, array $args) : bool{
 		$subcommand = strtolower(array_shift($args) ?? "help");
 		if(in_array($subcommand, ["help", "list"], true)){
 			return $subcommand === "help" ? $this->help($sender) : $this->list($sender);
+		}
+		if($subcommand === "ui" || $subcommand === "menu"){
+			if(!$sender instanceof Player){
+				$sender->sendMessage(TextFormat::RED . "The NPC UI can only be opened by a player.");
+				return true;
+			}
+			if(!$sender->hasPermission("npc.admin")){
+				$sender->sendMessage(TextFormat::RED . "You do not have permission to open the NPC UI.");
+				return true;
+			}
+			$this->ui->openMain($sender);
+			return true;
 		}
 		if(!$sender->hasPermission("npc.admin")){
 			$sender->sendMessage(TextFormat::RED . "You do not have permission to edit NPCs.");
@@ -54,6 +71,8 @@ final class NpcCommandHandler{
 			case "particle-type": return $this->effectType($sender, "particle", $args);
 			case "sound-type": case "hitsound": return $this->effectType($sender, "sound", $args);
 			case "menuname": case "menu-name": return $this->menuName($sender, $args);
+			case "type": case "entity-type": return $this->entityType($sender, $args);
+			case "animation": case "emote": return $this->animation($sender, $args);
 			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
 			case "tp": return $this->teleport($sender, $args);
 			case "reload": $this->manager->reload(); $sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded."); return true;
@@ -104,6 +123,9 @@ final class NpcCommandHandler{
 			"/npc particle-type <id> <flame|heart|smoke|...>",
 			"/npc sound-type <id> <click|pop|door_bump|...>",
 			"/npc menuname <id> <name|remove>",
+			"/npc type <id> <human|bee>",
+			"/npc animation <id> <none|emote|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]",
+			"/npc ui",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc debug | /npc reload"
 		] as $line){
@@ -414,6 +436,35 @@ final class NpcCommandHandler{
 		}
 		$ok = $this->manager->setMenuName($id, $name);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC menu name updated." : TextFormat::RED . "NPC not found.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function entityType(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$type = strtolower(array_shift($args) ?? "");
+		if($id === null || !in_array($type, ["human", "player", "bee"], true)){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc type <id> <human|bee>");
+			return true;
+		}
+		$ok = $this->manager->setEntityType($id, $type);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC entity type updated." : TextFormat::RED . "NPC not found.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function animation(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$type = strtolower(str_replace("-", "_", array_shift($args) ?? ""));
+		$animationId = (string) (array_shift($args) ?? "");
+		$interval = array_shift($args);
+		$trigger = strtolower(str_replace("-", "_", (string) (array_shift($args) ?? "timer")));
+		if($id === null || !in_array($type, ["none", "emote", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc animation <id> <none|emote|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]");
+			return true;
+		}
+		$ok = $this->manager->setAnimation($id, $type, $animationId, $interval !== null && is_numeric($interval) ? (int) $interval : 100, $trigger);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC animation updated." : TextFormat::RED . "NPC not found or animation is invalid.");
 		return true;
 	}
 

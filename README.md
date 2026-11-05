@@ -26,7 +26,11 @@ The first deployable milestone includes:
 - hit-session compatibility for `/slapper id`, `/slapper remove`, `/slapper cancel`, and left-click command actions;
 - Slapper Human `menuname` compatibility using the current Axolotl-PM player-list packet API;
 - edit aliases for names, commands, hand/armor equipment, scale, reload, and teleporting an NPC or player;
-- DevTools PHAR packaging and PHPStan Level Max in CI.
+- `/npc ui`, a PMForms-backed operator GUI for creating, editing, importing and deleting NPCs;
+- Human and lightweight Bee-display NPCs, with timer/spawn/right-click/left-click animation triggers;
+- `arm_swing`, `hurt`, `critical_hit`, `magic_critical`, and player emote animation packets;
+- optional ScoreHud integration with live `npc.*` tags;
+- DevTools PHAR packaging with the PMForms virion bundled locally, plus PHPStan Level Max in CI.
 
 NPC actions are configured by operators only. A player cannot write an action or a skin URL through the public command surface.
 
@@ -47,6 +51,9 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc particle-type <id> <type>
 /npc sound-type <id> <type>
 /npc menuname <id> <name|remove>
+/npc type <id> <human|bee>
+/npc animation <id> <none|emote|arm_swing|hurt|critical_hit|magic_critical> [id] [interval] [trigger]
+/npc ui
 /npc rotate <id> <on|off>
 /npc particle <id> <on|off>
 /npc sound <id> <on|off>
@@ -91,6 +98,28 @@ npcs:
 
 Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, or 128x128 RGBA file under `plugin_data/NPC/skins/`, then run `/npc skin <id> <relative-file>`. From in-game, `/npc skin <id> player` (or the old `/slapper edit <id> skin`) copies the executing player's validated skin, cape, and geometry into that local directory. Cape files must be exactly 8192 bytes and can be set in YAML with the `cape` field. The plugin does not download or follow skin URLs.
 
+## Operator UI
+
+`/npc ui` opens the operator menu built with the local `pmforms` virion. The menu can create an NPC, edit its name/type/skin/effects/animation, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. The form library is packaged into `NPC.phar`; a separate forms plugin is not required at runtime.
+
+The GUI is permission-gated by `npc.admin`. It is a control surface for trusted operators, not a player-facing NPC interaction menu.
+
+## Entity types and animations
+
+Human is the default and supports local skins, cape/geometry data, equipment, player-list menu names, and emotes. `bee` is a lightweight visual mob actor using the Bedrock `minecraft:bee` network identifier. It is not a full Bee AI implementation: it does not pathfind, pollinate, or persist as a world entity. Skins and equipment are disabled for Bee definitions.
+
+Animation configuration is stored with the NPC definition:
+
+```yaml
+entity-type: human
+animation-type: emote
+animation-id: wave
+animation-interval: 100
+animation-trigger: right_click
+```
+
+Use `timer` for a repeating animation, `spawn` for one animation when the NPC is spawned, or `right_click`/`left_click` for interaction-triggered animation. Client support for a particular emote is controlled by the Bedrock client; packet support is sent only for the selected actor.
+
 Player-specific integration placeholders are expanded for click actions. Nametags remain shared entity metadata, so `{online}` and `{players}` are suitable for persistent nametags while `{rank}` and `{balance}` are intended for action commands unless a future per-viewer nametag layer is enabled.
 
 Supported particle types are `flame`, `entity_flame`, `heart`, `critical`, `smoke`, `explode`, `portal`, `happy_villager`, `bubble`, `splash`, `water`, and `lava`. Supported hit sounds are `click`, `pop`, `door_bump`, `explode`, and `totem`. Unknown values fall back safely to the default effect instead of dynamically loading a class.
@@ -128,7 +157,24 @@ The command copies location, nametag, commands, scale, hand/armor aliases, menu 
 
 The core deliberately has no hard dependency on PureChat, PurePerms, ScoreHud, EcoAPI, SimpleEconomy, TownCoins, or TownEconomy. This lets it load when those plugins are absent and avoids coupling NPC persistence to another plugin's storage format.
 
-The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. ScoreHud tag registration, forms, non-Human entity types, and full addon parity still require separate integration tests. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter. Until those tests exist, this README does not claim full replacement compatibility with every historical Slapper extension.
+The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter.
+
+## ScoreHud integration
+
+ScoreHud is optional and is detected at runtime. When present, NPC refreshes these tags every ten ticks:
+
+```text
+{npc.count}
+{npc.ids}
+{npc.nearest_id}
+{npc.nearest_name}
+{npc.nearest_distance}
+{npc.nearest_entity_id}
+{npc.nearest_type}
+{npc.nearest_animation}
+```
+
+The tags are resolved in the viewer's current world. `npc.nearest_*` values refer to the closest currently spawned NPC, while `npc.count` and `npc.ids` include only NPCs visible in that world. The integration uses ScoreHud's event API and does not require ScoreHud to be installed for NPC to load.
 
 The old Slapper repositories and Poggit Archive pages supplied for this project are treated as feature references only. No source code has been copied into this implementation; license and API behavior will be reviewed separately for each future adapter.
 
@@ -142,7 +188,7 @@ $devtools = 'C:\Users\NhanAZ\Documents\GitHub\DevTools'
 $server = 'C:\Users\NhanAZ\Documents\GitHub\PocketMine-MP'
 
 & $php "$devtools\bin\devtools.php" doctor --project="$PWD" --json
-& $php -d phar.readonly=0 "$devtools\bin\devtools.php" build --project="$PWD" --out="$PWD\build" --overwrite --json
+& $php -d phar.readonly=0 "$devtools\bin\devtools.php" build --project="$PWD" --virions="$PWD\virions" --out="$PWD\build" --overwrite --json
 & $php "$devtools\bin\devtools.php" inspect --project="$PWD" --artifact="$PWD\build\NPC.phar" --json
 ```
 

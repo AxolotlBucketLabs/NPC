@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phpstan:
+    name: PHPStan max (Axolotl-PM 5.51.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Set up PHP for PocketMine API 5
+        uses: pmmp/setup-php-action@3.2.0
+        with:
+          php-version: "8.4"
+          install-path: "./bin"
+          pm-version-major: "5"
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --ignore-platform-req=ext-webrtc
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Analyze library
+        run: composer analyse
+
+  devtools:
+    name: Build a consumer with DevTools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Set up PHP for PocketMine API 5
+        uses: pmmp/setup-php-action@3.2.0
+        with:
+          php-version: "8.4"
+          install-path: "./bin"
+          pm-version-major: "5"
+
+      - name: Check out Axolotl-PM 5.51.1 source
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: axolotl-pm/PocketMine-MP
+          ref: e881fc1bc1c401545baf6bd1f824e41ff3f57bd1
+          path: .devtools-server
+          persist-credentials: false
+
+      - name: Prepare the shared virion fixture
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/pmforms-virions/pmforms"
+          cp virion.yml "$RUNNER_TEMP/pmforms-virions/pmforms/virion.yml"
+          cp -R src "$RUNNER_TEMP/pmforms-virions/pmforms/src"
+
+      - name: Analyze and build the consumer with DevTools v1.0.15
+        uses: NhanAZ/DevTools@v2
+        with:
+          project: examples/DevToolsConsumer
+          virions: ${{ runner.temp }}/pmforms-virions
+          output: ${{ runner.temp }}/pmforms-build
+          phpstan: max
+          phpstan-server: .devtools-server

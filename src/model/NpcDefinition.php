@@ -59,7 +59,12 @@ final class NpcDefinition{
 		private string $geometryData = "",
 		private string $particleType = "flame",
 		private string $soundType = "click",
-		private string $menuName = ""
+		private string $menuName = "",
+		private string $entityType = "human",
+		private string $animationType = "none",
+		private string $animationId = "",
+		private int $animationInterval = 100,
+		private string $animationTrigger = "timer"
 	){
 		self::validateId($id);
 		$this->lines = self::normalizeLines($lines);
@@ -71,6 +76,11 @@ final class NpcDefinition{
 		$this->capeFile = self::normalizeAssetPath($capeFile);
 		$this->geometryName = self::normalizeGeometryName($geometryName);
 		$this->geometryData = self::normalizeGeometryData($geometryData);
+		$this->entityType = self::normalizeEntityType($entityType);
+		$this->animationType = self::normalizeAnimationType($animationType);
+		$this->animationId = self::normalizeAnimationId($animationId);
+		$this->animationInterval = self::normalizeAnimationInterval($animationInterval);
+		$this->animationTrigger = self::normalizeAnimationTrigger($animationTrigger);
 	}
 
 	/** @param array<int|string, mixed> $data */
@@ -97,7 +107,12 @@ final class NpcDefinition{
 			self::stringValue($data, "geometry-data", ""),
 			self::stringValue($data, "particle-type", "flame"),
 			self::stringValue($data, "sound-type", "click"),
-			self::stringValue($data, "menu-name", "")
+			self::stringValue($data, "menu-name", ""),
+			self::stringValue($data, "entity-type", "human"),
+			self::stringValue($data, "animation-type", "none"),
+			self::stringValue($data, "animation-id", ""),
+			self::intValue($data, "animation-interval", 100),
+			self::stringValue($data, "animation-trigger", "timer")
 		);
 	}
 
@@ -124,7 +139,12 @@ final class NpcDefinition{
 			"geometry-data" => $this->geometryData,
 			"particle-type" => $this->particleType,
 			"sound-type" => $this->soundType,
-			"menu-name" => $this->menuName
+			"menu-name" => $this->menuName,
+			"entity-type" => $this->entityType,
+			"animation-type" => $this->animationType,
+			"animation-id" => $this->animationId,
+			"animation-interval" => $this->animationInterval,
+			"animation-trigger" => $this->animationTrigger
 		];
 	}
 
@@ -153,6 +173,11 @@ final class NpcDefinition{
 	public function getParticleType() : string{ return $this->particleType; }
 	public function getSoundType() : string{ return $this->soundType; }
 	public function getMenuName() : string{ return $this->menuName; }
+	public function getEntityType() : string{ return $this->entityType; }
+	public function getAnimationType() : string{ return $this->animationType; }
+	public function getAnimationId() : string{ return $this->animationId; }
+	public function getAnimationInterval() : int{ return $this->animationInterval; }
+	public function getAnimationTrigger() : string{ return $this->animationTrigger; }
 
 	/** @param array<int|string, mixed> $lines */
 	public function setLines(array $lines) : void{ $this->lines = self::normalizeLines($lines); }
@@ -196,6 +221,13 @@ final class NpcDefinition{
 	public function setMenuName(string $menuName) : void{
 		$menuName = str_replace(["\r", "\n"], " ", trim($menuName));
 		$this->menuName = substr($menuName, 0, 128);
+	}
+	public function setEntityType(string $entityType) : void{ $this->entityType = self::normalizeEntityType($entityType); }
+	public function setAnimation(string $type, string $id = "", int $interval = 100, string $trigger = "timer") : void{
+		$this->animationType = self::normalizeAnimationType($type);
+		$this->animationId = self::normalizeAnimationId($id);
+		$this->animationInterval = self::normalizeAnimationInterval($interval);
+		$this->animationTrigger = self::normalizeAnimationTrigger($trigger);
 	}
 
 	private static function validateId(string $id) : void{
@@ -285,6 +317,33 @@ final class NpcDefinition{
 		return preg_match('/^[a-z0-9_]{1,32}$/D', $name) === 1 ? $name : $default;
 	}
 
+	private static function normalizeEntityType(string $type) : string{
+		$type = strtolower(trim($type));
+		return match($type){
+			"bee" => "bee",
+			default => "human"
+		};
+	}
+
+	private static function normalizeAnimationType(string $type) : string{
+		$type = strtolower(str_replace("-", "_", trim($type)));
+		return in_array($type, ["none", "emote", "arm_swing", "hurt", "critical_hit", "magic_critical"], true) ? $type : "none";
+	}
+
+	private static function normalizeAnimationId(string $id) : string{
+		$id = str_replace(["\r", "\n"], "", trim($id));
+		return substr($id, 0, 128);
+	}
+
+	private static function normalizeAnimationInterval(int $interval) : int{
+		return min(86400, max(1, $interval));
+	}
+
+	private static function normalizeAnimationTrigger(string $trigger) : string{
+		$trigger = strtolower(str_replace("-", "_", trim($trigger)));
+		return in_array($trigger, ["timer", "spawn", "right_click", "left_click"], true) ? $trigger : "timer";
+	}
+
 	private static function normalizeCooldown(float $cooldown) : float{
 		if(!is_finite($cooldown)){
 			return 0.0;
@@ -309,6 +368,12 @@ final class NpcDefinition{
 	private static function floatValue(array $data, string $key, float $default) : float{
 		$value = $data[$key] ?? $default;
 		return is_int($value) || is_float($value) || (is_string($value) && is_numeric($value)) ? (float) $value : $default;
+	}
+
+	/** @param array<int|string, mixed> $data */
+	private static function intValue(array $data, string $key, int $default) : int{
+		$value = $data[$key] ?? $default;
+		return is_int($value) || (is_string($value) && is_numeric($value)) ? (int) $value : $default;
 	}
 
 	/** @param array<int|string, mixed> $data */
