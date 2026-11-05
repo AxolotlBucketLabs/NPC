@@ -1,0 +1,9 @@
+/build/*.phar
+/build/*.json
+/build/*.txt
+/vendor/
+/.phpunit.cache/
+/.phpstan-tmp/
+/.phpstan.cache/
+/phpstan.generated.neon
+/.runtime-smoke/

@@ -1,0 +1,29 @@
+name: NPC
+main: NhanAZ\NPC\Main
+src-namespace-prefix: NhanAZ\NPC
+version: 0.1.0
+api: 5.0.0
+load: POSTWORLD
+author: NhanAZ
+description: All-in-one NPC system for Axolotl-PM and PocketMine-MP API 5
+website: https://github.com/NhanAZ-Plugins/NPC
+commands:
+  npc:
+    description: Manage NPCs
+    usage: "/npc help"
+    permission: npc.command
+    aliases: [slapper]
+  rca:
+    description: Execute a configured NPC action as a player
+    usage: "/rca <player> <command>"
+    permission: npc.rca
+permissions:
+  npc.command:
+    description: Allows using the NPC command
+    default: op
+  npc.admin:
+    description: Allows creating and editing NPCs
+    default: op
+  npc.rca:
+    description: Allows the compatibility rca command
+    default: op
