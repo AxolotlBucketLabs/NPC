@@ -5,7 +5,7 @@
     "license": "MIT",
     "require": {
         "axolotl-pm/pocketmine-mp": "~5.51.1",
-        "dktapps/pmforms": "dev-master"
+        "dktapps/pmforms": "~2.3.1"
     },
     "repositories": [
         {
@@ -20,6 +20,6 @@
         },
         "sort-packages": true
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true
 }
