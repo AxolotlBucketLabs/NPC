@@ -8,11 +8,13 @@ use NhanAZ\NPC\manager\NpcManager;
 use NhanAZ\NPC\model\EmoteCatalog;
 use dktapps\pmforms\CustomForm;
 use dktapps\pmforms\CustomFormResponse;
+use dktapps\pmforms\FormIcon;
 use dktapps\pmforms\MenuForm;
 use dktapps\pmforms\MenuOption;
 use dktapps\pmforms\ModalForm;
 use dktapps\pmforms\element\Dropdown;
 use dktapps\pmforms\element\Input;
+use dktapps\pmforms\element\Label;
 use dktapps\pmforms\element\Toggle;
 use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
@@ -34,13 +36,15 @@ final class NpcUiManager{
 			[
 				new MenuOption("Create NPC"),
 				new MenuOption("List NPCs"),
+				new MenuOption("Browse Emotes"),
 				new MenuOption("Migrate Slapper")
 			],
 			function(Player $player, int $selected) : void{
 				switch($selected){
 					case 0: $this->openCreate($player); break;
 					case 1: $this->openList($player); break;
-					case 2: $this->openMigration($player); break;
+					case 2: $this->openEmoteSearch($player); break;
+					case 3: $this->openMigration($player); break;
 				}
 			},
 			static function(Player $player) : void{}
@@ -108,6 +112,7 @@ final class NpcUiManager{
 			"Choose what to edit.",
 			[
 				new MenuOption("Basic settings"),
+				new MenuOption("Player emotes (with images)"),
 				new MenuOption("Actions"),
 				new MenuOption("Equipment"),
 				new MenuOption("Delete NPC"),
@@ -116,10 +121,11 @@ final class NpcUiManager{
 			function(Player $player, int $selected) use ($id) : void{
 				switch($selected){
 					case 0: $this->openBasic($player, $id); break;
-					case 1: $this->openActions($player, $id); break;
-					case 2: $this->openEquipment($player, $id); break;
-					case 3: $this->openDelete($player, $id); break;
-					case 4: $this->openList($player); break;
+					case 1: $this->openEmoteSearch($player, $id); break;
+					case 2: $this->openActions($player, $id); break;
+					case 3: $this->openEquipment($player, $id); break;
+					case 4: $this->openDelete($player, $id); break;
+					case 5: $this->openList($player); break;
 				}
 			},
 			static function(Player $player) : void{}
@@ -193,6 +199,123 @@ final class NpcUiManager{
 				$this->openEdit($player, $id);
 			},
 			static function(Player $player) : void{}
+		));
+	}
+
+	private function openEmoteSearch(Player $player, ?string $npcId = null) : void{
+		$title = $npcId === null ? "Browse player emotes" : "Choose emote: " . $npcId;
+		$player->sendForm(new CustomForm(
+			$title,
+			[
+				new Label("info", "Each result has its official Bedrock thumbnail. Select one to configure it for the NPC."),
+				new Input("query", "Search title", "air guitar or wave", ""),
+				new Input("page", "Page", "1", "1")
+			],
+			function(Player $player, CustomFormResponse $response) use ($npcId) : void{
+				$query = trim($response->getString("query"));
+				$page = is_numeric($response->getString("page")) ? max(1, (int) $response->getString("page")) : 1;
+				$this->openEmoteResults($player, $npcId, $query, $page - 1);
+			},
+			static function(Player $player) : void{}
+		));
+	}
+
+	private function openEmoteResults(Player $player, ?string $npcId, string $query, int $page) : void{
+		$pageSize = 24;
+		$matches = EmoteCatalog::search($query, $pageSize + 1, $page * $pageSize);
+		$hasNext = count($matches) > $pageSize;
+		if($hasNext){
+			array_pop($matches);
+		}
+		if($matches === [] && $page > 0){
+			$this->openEmoteResults($player, $npcId, $query, $page - 1);
+			return;
+		}
+
+		$options = [new MenuOption("Search again")];
+		$actions = ["search"];
+		if($page > 0){
+			$options[] = new MenuOption("Previous page");
+			$actions[] = "previous";
+		}
+		foreach($matches as $index => $entry){
+			$icon = EmoteCatalog::imageUrl($entry["uuid"]);
+			$options[] = new MenuOption(
+				$entry["title"] . "\n" . $entry["uuid"],
+				$icon === null ? null : new FormIcon($icon)
+			);
+			$actions[] = "emote:" . $index;
+		}
+		if($hasNext){
+			$options[] = new MenuOption("Next page");
+			$actions[] = "next";
+		}
+
+		$first = $page * $pageSize + 1;
+		$last = $first + count($matches) - 1;
+		$target = $npcId === null ? "" : " for " . $npcId;
+		$player->sendForm(new MenuForm(
+			"Emotes " . ($page + 1) . $target,
+			"Showing " . (count($matches) === 0 ? "0" : $first . "-" . $last) . " of " . EmoteCatalog::count() . ($query === "" ? "" : "\nSearch: " . $query),
+			$options,
+			function(Player $player, int $selected) use ($actions, $npcId, $query, $page, $matches) : void{
+				$action = $actions[$selected] ?? "";
+				switch($action){
+					case "search":
+						$this->openEmoteSearch($player, $npcId);
+						return;
+					case "previous":
+						$this->openEmoteResults($player, $npcId, $query, max(0, $page - 1));
+						return;
+					case "next":
+						$this->openEmoteResults($player, $npcId, $query, $page + 1);
+						return;
+				}
+				if(str_starts_with($action, "emote:")){
+					$index = (int) substr($action, 6);
+					$entry = $matches[$index] ?? null;
+					if($entry !== null){
+						if($npcId === null){
+							$player->sendMessage(TextFormat::GREEN . $entry["title"] . TextFormat::GRAY . " => " . $entry["uuid"]);
+							$this->openEmoteResults($player, null, $query, $page);
+						}else{
+							$this->openEmoteConfigure($player, $npcId, $entry["title"], $entry["uuid"]);
+						}
+					}
+				}
+			},
+			function(Player $player) use ($npcId) : void{
+				if($npcId === null){
+					$this->openMain($player);
+				}else{
+					$this->openEdit($player, $npcId);
+				}
+			}
+		));
+	}
+
+	private function openEmoteConfigure(Player $player, string $npcId, string $title, string $uuid) : void{
+		$player->sendForm(new CustomForm(
+			"Apply emote: " . $title,
+			[
+				new Label("info", "UUID: " . $uuid . "\nThe thumbnail was shown in the previous menu."),
+				new Input("interval", "Interval in ticks", "100", "100"),
+				new Dropdown("trigger", "Trigger", ["Timer", "Spawn", "Right click", "Left click"])
+			],
+			function(Player $player, CustomFormResponse $response) use ($npcId, $uuid) : void{
+				$triggers = ["timer", "spawn", "right_click", "left_click"];
+				$interval = is_numeric($response->getString("interval")) ? max(1, (int) $response->getString("interval")) : 100;
+				$trigger = $triggers[$response->getInt("trigger")] ?? "timer";
+				if($this->manager->setAnimation($npcId, "emote", $uuid, $interval, $trigger)){
+					$player->sendMessage(TextFormat::GREEN . "NPC player emote updated.");
+					$this->openEdit($player, $npcId);
+				}else{
+					$player->sendMessage(TextFormat::RED . "NPC not found or emote is invalid.");
+				}
+			},
+			function(Player $player) use ($npcId) : void{
+				$this->openEdit($player, $npcId);
+			}
 		));
 	}
 

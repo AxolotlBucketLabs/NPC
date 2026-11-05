@@ -79,13 +79,31 @@ final class EmoteCatalog{
 		return self::$entries === [] ? count(self::$catalog) : count(self::$entries);
 	}
 
+	/**
+	 * Returns the official thumbnail URL for a catalog entry.
+	 *
+	 * The upstream catalog stores one 128x128 PNG per UUID. The form uses a URL
+	 * icon, so the images remain outside the plugin PHAR and are fetched by the
+	 * Bedrock client only when a player opens an emote menu.
+	 */
+	public static function imageUrl(string $value) : ?string{
+		$uuid = self::resolve($value);
+		return $uuid === null ? null : "https://raw.githubusercontent.com/TwistedAsylumMC/Bedrock-Emotes/main/images/" . $uuid . ".png";
+	}
+
 	/** @return list<array{title: string, uuid: string}> */
-	public static function search(string $query = "", int $limit = 25) : array{
+	public static function search(string $query = "", int $limit = 25, int $offset = 0) : array{
 		$query = self::normalizeAlias($query);
+		$offset = max(0, $offset);
 		$matches = [];
+		$skipped = 0;
 		if(self::$entries !== []){
 			foreach(self::$entries as $entry){
 				if($query !== "" && !str_contains(self::normalizeAlias($entry["title"]), $query)){
+					continue;
+				}
+				if($skipped < $offset){
+					++$skipped;
 					continue;
 				}
 				$matches[] = $entry;
@@ -97,6 +115,10 @@ final class EmoteCatalog{
 		}
 		foreach(self::$catalog as $alias => $uuid){
 			if($query !== "" && !str_contains($alias, $query)){
+				continue;
+			}
+			if($skipped < $offset){
+				++$skipped;
 				continue;
 			}
 			$matches[] = [

@@ -103,7 +103,7 @@ Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, o
 
 ## Operator UI
 
-`/npc ui` opens the operator menu built with the `pmforms` virion. The menu can create an NPC, edit its name/type/skin/effects/animation, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. DevTools prepares PMForms from the pinned `NhanAZ-Libraries/pmforms` Composer source and packages it into `NPC.phar`; a separate forms plugin is not required at runtime.
+`/npc ui` opens the operator menu built with the `pmforms` virion. The menu can create an NPC, edit its name/type/skin/effects/animation, browse the emote catalog, select an emote from an image-backed paginated menu, add or remove actions, edit equipment, migrate loaded Slapper entities, and delete definitions. Emote result buttons show the official 128x128 thumbnail from the Bedrock-Emotes image repository; only the URL is sent in the form, so the PNGs are not copied into `NPC.phar`. DevTools prepares PMForms from the pinned `NhanAZ-Libraries/pmforms` Composer source and packages it into `NPC.phar`; a separate forms plugin is not required at runtime.
 
 The GUI is permission-gated by `npc.admin`. It is a control surface for trusted operators, not a player-facing NPC interaction menu.
 
@@ -129,7 +129,7 @@ animation-trigger: right_click
 
 The old `animation-type: emote` and `animation-id: wave` form remains valid; `wave` is resolved to its Bedrock emote UUID before the packet is sent. For a Bee visual NPC, use `entity-type: bee` and `animation-type: fly`. The `animation-id` is ignored for `fly`; the interval is retained for compatibility but continuous flight is updated every server tick.
 
-The bundled name catalog is generated from [TwistedAsylumMC/Bedrock-Emotes](https://github.com/TwistedAsylumMC/Bedrock-Emotes)' `emotes.json` snapshot. Only title and UUID pairs are included; Marketplace images, offers and other metadata are not copied. Names work with spaces (`Air Guitar`) or underscores (`air_guitar`). Duplicate titles remain addressable by entering the UUID directly.
+The bundled name catalog is generated from [TwistedAsylumMC/Bedrock-Emotes](https://github.com/TwistedAsylumMC/Bedrock-Emotes)' `emotes.json` snapshot. Only title and UUID pairs are included in the catalog; the form resolves thumbnails from the matching `images/<uuid>.png` URL in that repository. Marketplace offers and other metadata are not copied. Names work with spaces (`Air Guitar`) or underscores (`air_guitar`). Duplicate titles remain addressable by entering the UUID directly.
 
 Use `timer` for a repeating emote or actor animation, `spawn` for one event when the NPC is spawned, or `right_click`/`left_click` for interaction-triggered events. Client support for a particular emote is controlled by the Bedrock client; the packet is sent only for the selected Human NPC. Bee motion is updated continuously and does not use an emote packet.
 

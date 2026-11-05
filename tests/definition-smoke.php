@@ -44,6 +44,13 @@ $emoteCatalog = file_get_contents(dirname(__DIR__) . '/resources/emotes.jsonl');
 if($emoteCatalog === false || EmoteCatalog::load($emoteCatalog) < 1000 || EmoteCatalog::resolve("4th dimension") !== "5f2c9473-ff88-ed4f-674b-9943dd6c81f2" || EmoteCatalog::resolve("tp random") !== "f8721633-b6e8-b55c-fe38-984f52d756bc"){
 	throw new RuntimeException("Bundled Marketplace emote catalog failed");
 }
+if(EmoteCatalog::imageUrl("e115b8af-b508-06c0-c4a9-fe540bf2fd5b") !== "https://raw.githubusercontent.com/TwistedAsylumMC/Bedrock-Emotes/main/images/e115b8af-b508-06c0-c4a9-fe540bf2fd5b.png"){
+	throw new RuntimeException("Emote thumbnail URL generation failed");
+}
+$airGuitarVariants = EmoteCatalog::search("air guitar", 2, 1);
+if(count($airGuitarVariants) !== 2 || $airGuitarVariants[0]["uuid"] !== "d1d6eaef-c80f-e289-7770-5c1df04cf14f"){
+	throw new RuntimeException("Emote catalog pagination failed");
+}
 
 $roundTrip = NpcDefinition::fromArray("welcome", $definition->toArray());
 if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRotateEnabled() || $roundTrip->getEquipment()["hand"] !== "iron_sword" || $roundTrip->getEntityType() !== "bee" || $roundTrip->getAnimationType() !== "emote" || $roundTrip->getAnimationTrigger() !== "right_click"){

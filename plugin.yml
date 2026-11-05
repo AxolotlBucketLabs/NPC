@@ -1,7 +1,7 @@
 name: NPC
 main: NhanAZ\NPC\Main
 src-namespace-prefix: NhanAZ\NPC
-version: 0.5.1
+version: 0.5.2
 api: 5.0.0
 load: POSTWORLD
 author: NhanAZ
