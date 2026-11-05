@@ -7,6 +7,7 @@ namespace NhanAZ\NPC\model;
 use InvalidArgumentException;
 use function array_values;
 use function count;
+use function in_array;
 use function is_array;
 use function is_finite;
 use function is_int;
@@ -15,6 +16,8 @@ use function is_string;
 use function max;
 use function min;
 use function preg_match;
+use function str_contains;
+use function str_starts_with;
 use function trim;
 
 final class NpcDefinition{
@@ -24,9 +27,13 @@ final class NpcDefinition{
 	/** @var list<string> */
 	private array $commands;
 
+	/** @var array<string, string> */
+	private array $equipment;
+
 	/**
 	 * @param array<int|string, mixed> $lines
 	 * @param array<int|string, mixed> $commands
+	 * @param array<int|string, mixed> $equipment
 	 */
 	public function __construct(
 		private readonly string $id,
@@ -42,13 +49,23 @@ final class NpcDefinition{
 		private bool $rotate = false,
 		private bool $particle = false,
 		private bool $sound = true,
-		private float $scale = 1.0
+		private float $scale = 1.0,
+		array $equipment = [],
+		private string $skinFile = "",
+		private string $capeFile = "",
+		private string $geometryName = "",
+		private string $geometryData = ""
 	){
 		self::validateId($id);
 		$this->lines = self::normalizeLines($lines);
 		$this->commands = self::normalizeCommands($commands);
+		$this->equipment = self::normalizeEquipment($equipment);
 		$this->cooldown = self::normalizeCooldown($cooldown);
 		$this->scale = self::normalizeScale($scale);
+		$this->skinFile = self::normalizeAssetPath($skinFile);
+		$this->capeFile = self::normalizeAssetPath($capeFile);
+		$this->geometryName = self::normalizeGeometryName($geometryName);
+		$this->geometryData = self::normalizeGeometryData($geometryData);
 	}
 
 	/** @param array<int|string, mixed> $data */
@@ -67,7 +84,12 @@ final class NpcDefinition{
 			self::boolValue($data, "rotate", false),
 			self::boolValue($data, "particle", false),
 			self::boolValue($data, "sound", true),
-			self::floatValue($data, "scale", 1.0)
+			self::floatValue($data, "scale", 1.0),
+			is_array($data["equipment"] ?? null) ? $data["equipment"] : [],
+			self::stringValue($data, "skin", ""),
+			self::stringValue($data, "cape", ""),
+			self::stringValue($data, "geometry-name", ""),
+			self::stringValue($data, "geometry-data", "")
 		);
 	}
 
@@ -86,7 +108,12 @@ final class NpcDefinition{
 			"rotate" => $this->rotate,
 			"particle" => $this->particle,
 			"sound" => $this->sound,
-			"scale" => $this->scale
+			"scale" => $this->scale,
+			"equipment" => $this->equipment,
+			"skin" => $this->skinFile,
+			"cape" => $this->capeFile,
+			"geometry-name" => $this->geometryName,
+			"geometry-data" => $this->geometryData
 		];
 	}
 
@@ -106,6 +133,12 @@ final class NpcDefinition{
 	public function isParticleEnabled() : bool{ return $this->particle; }
 	public function isSoundEnabled() : bool{ return $this->sound; }
 	public function getScale() : float{ return $this->scale; }
+	/** @return array<string, string> */
+	public function getEquipment() : array{ return $this->equipment; }
+	public function getSkinFile() : string{ return $this->skinFile; }
+	public function getCapeFile() : string{ return $this->capeFile; }
+	public function getGeometryName() : string{ return $this->geometryName; }
+	public function getGeometryData() : string{ return $this->geometryData; }
 
 	/** @param array<int|string, mixed> $lines */
 	public function setLines(array $lines) : void{ $this->lines = self::normalizeLines($lines); }
@@ -116,6 +149,26 @@ final class NpcDefinition{
 	public function setParticle(bool $particle) : void{ $this->particle = $particle; }
 	public function setSound(bool $sound) : void{ $this->sound = $sound; }
 	public function setScale(float $scale) : void{ $this->scale = self::normalizeScale($scale); }
+	/** @param array<int|string, mixed> $equipment */
+	public function setEquipment(array $equipment) : void{ $this->equipment = self::normalizeEquipment($equipment); }
+	public function setEquipmentSlot(string $slot, string $item) : bool{
+		if(!in_array($slot, ["hand", "helmet", "chestplate", "leggings", "boots"], true)){
+			return false;
+		}
+		$item = trim($item);
+		if($item === ""){
+			unset($this->equipment[$slot]);
+		}else{
+			$this->equipment[$slot] = substr($item, 0, 128);
+		}
+		return true;
+	}
+	public function setSkinFile(string $skinFile) : void{ $this->skinFile = self::normalizeAssetPath($skinFile); }
+	public function setCapeFile(string $capeFile) : void{ $this->capeFile = self::normalizeAssetPath($capeFile); }
+	public function setGeometry(string $name, string $data) : void{
+		$this->geometryName = self::normalizeGeometryName($name);
+		$this->geometryData = self::normalizeGeometryData($data);
+	}
 
 	private static function validateId(string $id) : void{
 		if(preg_match('/^[A-Za-z0-9._-]{1,32}$/D', $id) !== 1){
@@ -163,6 +216,40 @@ final class NpcDefinition{
 			}
 		}
 		return $result;
+	}
+
+	/**
+	 * @param array<int|string, mixed> $equipment
+	 * @return array<string, string>
+	 */
+	private static function normalizeEquipment(array $equipment) : array{
+		$result = [];
+		foreach($equipment as $slot => $item){
+			if(!is_string($slot) || !in_array($slot, ["hand", "helmet", "chestplate", "leggings", "boots"], true) || !is_string($item)){
+				continue;
+			}
+			$item = trim($item);
+			if($item !== ""){
+				$result[$slot] = substr($item, 0, 128);
+			}
+		}
+		return $result;
+	}
+
+	private static function normalizeAssetPath(string $path) : string{
+		$path = trim($path);
+		if($path === "" || strlen($path) > 128 || str_contains($path, "..") || str_contains($path, "\\") || str_starts_with($path, "/") || preg_match('/^[A-Za-z0-9._\/-]+$/D', $path) !== 1){
+			return "";
+		}
+		return $path;
+	}
+
+	private static function normalizeGeometryName(string $name) : string{
+		return substr(trim($name), 0, 256);
+	}
+
+	private static function normalizeGeometryData(string $data) : string{
+		return strlen($data) <= 65536 ? $data : "";
 	}
 
 	private static function normalizeCooldown(float $cooldown) : float{

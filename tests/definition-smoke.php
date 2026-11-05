@@ -20,7 +20,8 @@ $definition = new NpcDefinition(
 	true,
 	false,
 	true,
-	1.0
+	1.0,
+	["hand" => "iron_sword", "helmet" => "iron_helmet"]
 );
 
 if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 || $definition->getCooldown() !== 2.0){
@@ -28,7 +29,7 @@ if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 ||
 }
 
 $roundTrip = NpcDefinition::fromArray("welcome", $definition->toArray());
-if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRotateEnabled()){
+if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRotateEnabled() || $roundTrip->getEquipment()["hand"] !== "iron_sword"){
 	throw new RuntimeException("NpcDefinition round trip failed");
 }
 

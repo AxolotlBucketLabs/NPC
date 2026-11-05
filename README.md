@@ -15,6 +15,8 @@ The first deployable milestone includes:
 - per-player interaction cooldowns;
 - optional look-at-nearest-player rotation;
 - optional flame particles and click sound;
+- local raw RGBA skin/cape files with path confinement and size validation;
+- basic hand and armor equipment from PocketMine item aliases;
 - `{npc}`, `{world}`, `{online}` and `{players}` placeholders in nametags;
 - `/slapper` as a command alias and a guarded `/rca <player> <command>` compatibility command;
 - DevTools PHAR packaging and PHPStan Level Max in CI.
@@ -65,7 +67,12 @@ npcs:
     particle: false
     sound: true
     scale: 1
+    equipment:
+      hand: iron_sword
+      helmet: iron_helmet
 ```
+
+Raw skins are deliberately local-only in this milestone. Place a 64x32, 64x64, or 128x128 RGBA file under `plugin_data/NPC/skins/`, then run `/npc skin <id> <relative-file>`. Cape files must be exactly 8192 bytes and can be set in YAML with the `cape` field. The plugin does not download or follow skin URLs.
 
 ## Compatibility boundary
 

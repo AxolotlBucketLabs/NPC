@@ -36,6 +36,8 @@ final class NpcCommandHandler{
 			case "setline": return $this->setLine($sender, $args);
 			case "addcommand": return $this->addCommand($sender, $args);
 			case "clearcommands": return $this->clearCommands($sender, $args);
+			case "equipment": return $this->equipment($sender, $args);
+			case "skin": return $this->skin($sender, $args);
 			case "cooldown": return $this->cooldown($sender, $args);
 			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
 			case "tp": return $this->teleport($sender, $args);
@@ -77,6 +79,8 @@ final class NpcCommandHandler{
 			"/npc setline <id> <line> <text>",
 			"/npc addcommand <id> <command|console:command>",
 			"/npc clearcommands <id>",
+			"/npc equipment <id> <hand|helmet|chestplate|leggings|boots> <item|clear>",
+			"/npc skin <id> <relative-raw-skin-file|clear>",
 			"/npc cooldown <id> <seconds>",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc debug | /npc reload"
@@ -160,6 +164,32 @@ final class NpcCommandHandler{
 		$id = array_shift($args);
 		$ok = $id !== null && $this->manager->setCommands($id, []);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC actions cleared." : TextFormat::RED . "NPC not found."); return true;
+	}
+
+	/** @param list<string> $args */
+	private function equipment(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$slot = strtolower(array_shift($args) ?? "");
+		$item = trim(implode(" ", $args));
+		if($id === null || $slot === "" || $item === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /npc equipment <id> <slot> <item|clear>"); return true;
+		}
+		if(strtolower($item) === "clear"){
+			$item = "";
+		}
+		$ok = $this->manager->setEquipment($id, $slot, $item);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC equipment updated." : TextFormat::RED . "NPC or equipment slot is invalid."); return true;
+	}
+
+	/** @param list<string> $args */
+	private function skin(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$file = trim(implode(" ", $args));
+		if($id === null || $file === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /npc skin <id> <relative-raw-skin-file|clear>"); return true;
+		}
+		$ok = $this->manager->setSkinFile($id, strtolower($file) === "clear" ? "" : $file);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC skin setting updated. Put raw RGBA data under plugin_data/NPC/skins." : TextFormat::RED . "NPC not found or skin path is invalid."); return true;
 	}
 
 	/** @param list<string> $args */

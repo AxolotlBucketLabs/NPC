@@ -7,7 +7,9 @@ namespace NhanAZ\NPC\manager;
 use NhanAZ\NPC\entity\NpcEntity;
 use NhanAZ\NPC\model\NpcDefinition;
 use pocketmine\console\ConsoleCommandSender;
+use pocketmine\entity\Skin;
 use pocketmine\event\player\PlayerEntityInteractEvent;
+use pocketmine\item\StringToItemParser;
 use pocketmine\player\Player;
 use pocketmine\utils\Config;
 use pocketmine\utils\TextFormat;
@@ -19,13 +21,21 @@ use NhanAZ\NPC\Main;
 use function atan2;
 use function count;
 use function deg2rad;
+use function file_get_contents;
+use function filesize;
 use function is_array;
+use function is_dir;
+use function is_file;
 use function is_string;
 use function microtime;
+use function realpath;
 use function rad2deg;
 use function sprintf;
+use function str_replace;
+use function str_starts_with;
 use function strtolower;
 use function trim;
+use const DIRECTORY_SEPARATOR;
 
 final class NpcManager{
 	/** @var array<string, NpcDefinition> */
@@ -177,13 +187,21 @@ final class NpcManager{
 			$definition->getYaw(),
 			$definition->getPitch()
 		);
-		$entity = new NpcEntity($location, $definition->getId());
+		$entity = new NpcEntity($location, $definition->getId(), $this->loadSkin($definition));
 		$entity->setScale($definition->getScale());
+		$this->applyEquipment($entity, $definition);
 		$entity->setNameTag($this->renderLines($definition));
 		$entity->setNameTagVisible(true);
 		$entity->setNameTagAlwaysVisible(true);
 		$this->entities[$definition->getId()] = $entity;
 		return $entity;
+	}
+
+	private function respawn(string $id) : void{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition !== null){
+			$this->spawn($definition);
+		}
 	}
 
 	public function reload() : void{
@@ -215,6 +233,27 @@ final class NpcManager{
 		}
 		$definition->setCommands($commands);
 		$this->save();
+		return true;
+	}
+
+	public function setEquipment(string $id, string $slot, string $item) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null || !$definition->setEquipmentSlot($slot, $item)){
+			return false;
+		}
+		$this->save();
+		$this->respawn($id);
+		return true;
+	}
+
+	public function setSkinFile(string $id, string $file) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		$definition->setSkinFile($file);
+		$this->save();
+		$this->respawn($id);
 		return true;
 	}
 
@@ -295,12 +334,14 @@ final class NpcManager{
 		foreach($this->definitions as $id => $definition){
 			$entity = $this->entities[$id] ?? null;
 			$lines[] = sprintf(
-				"%s: world=%s entity=%s lines=%d actions=%d cooldown=%.2f",
+				"%s: world=%s entity=%s lines=%d actions=%d equipment=%d skin=%s cooldown=%.2f",
 				$id,
 				$definition->getWorld(),
 				$entity !== null && !$entity->isClosed() ? "yes" : "no",
 				count($definition->getLines()),
 				count($definition->getCommands()),
+				count($definition->getEquipment()),
+				$definition->getSkinFile() === "" ? "default" : $definition->getSkinFile(),
 				$definition->getCooldown()
 			);
 		}
@@ -349,6 +390,71 @@ final class NpcManager{
 				}
 			}else{
 				$this->plugin->getServer()->dispatchCommand($player, ltrim($command, "/"));
+			}
+		}
+	}
+
+	private function loadSkin(NpcDefinition $definition) : Skin{
+		$skinData = $this->readSkinAsset($definition->getSkinFile(), max(Skin::ACCEPTED_SKIN_SIZES));
+		if($skinData === "" || !in_array(strlen($skinData), Skin::ACCEPTED_SKIN_SIZES, true)){
+			if($definition->getSkinFile() !== ""){
+				$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' has an invalid or missing raw skin file; using fallback skin");
+			}
+			return NpcEntity::defaultSkin();
+		}
+
+		$capeData = $this->readSkinAsset($definition->getCapeFile(), 8192);
+		if($capeData !== "" && strlen($capeData) !== 8192){
+			$capeData = "";
+		}
+		try{
+			return new Skin(
+				"NPC_" . $definition->getId(),
+				$skinData,
+				$capeData,
+				$definition->getGeometryName(),
+				$definition->getGeometryData()
+			);
+		}catch(\Throwable $error){
+			$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' skin rejected: " . $error->getMessage());
+			return NpcEntity::defaultSkin();
+		}
+	}
+
+	private function readSkinAsset(string $relativePath, int $maxBytes) : string{
+		if($relativePath === ""){
+			return "";
+		}
+		$root = realpath($this->plugin->getDataFolder() . "skins");
+		if($root === false || !is_dir($root)){
+			return "";
+		}
+		$path = realpath($root . DIRECTORY_SEPARATOR . str_replace("/", DIRECTORY_SEPARATOR, $relativePath));
+		if($path === false || !is_file($path) || !str_starts_with($path, $root . DIRECTORY_SEPARATOR)){
+			return "";
+		}
+		$size = filesize($path);
+		if($size === false || $size > $maxBytes){
+			return "";
+		}
+		$data = file_get_contents($path);
+		return is_string($data) ? $data : "";
+	}
+
+	private function applyEquipment(NpcEntity $entity, NpcDefinition $definition) : void{
+		$parser = StringToItemParser::getInstance();
+		foreach($definition->getEquipment() as $slot => $itemName){
+			$item = $parser->parse($itemName);
+			if($item === null){
+				$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' has an unknown equipment item '" . $itemName . "'");
+				continue;
+			}
+			switch($slot){
+				case "hand": $entity->getInventory()->setItemInHand($item); break;
+				case "helmet": $entity->getArmorInventory()->setHelmet($item); break;
+				case "chestplate": $entity->getArmorInventory()->setChestplate($item); break;
+				case "leggings": $entity->getArmorInventory()->setLeggings($item); break;
+				case "boots": $entity->getArmorInventory()->setBoots($item); break;
 			}
 		}
 	}

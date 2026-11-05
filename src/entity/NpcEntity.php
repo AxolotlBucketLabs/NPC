@@ -11,8 +11,8 @@ use pocketmine\entity\Location;
 
 final class NpcEntity extends Human implements NeverSavedWithChunkEntity{
 
-	public function __construct(Location $location, private string $npcId){
-		parent::__construct($location, self::defaultSkin());
+	public function __construct(Location $location, private string $npcId, ?Skin $skin = null){
+		parent::__construct($location, $skin ?? self::defaultSkin());
 
 		// NPC definitions are the source of truth. They must not be duplicated into
 		// world chunks, which also keeps custom plugin entities out of world saves.
@@ -25,7 +25,7 @@ final class NpcEntity extends Human implements NeverSavedWithChunkEntity{
 		return $this->npcId;
 	}
 
-	private static function defaultSkin() : Skin{
+	public static function defaultSkin() : Skin{
 		// A valid opaque 64x64 fallback skin. Custom skin/geometry loading is kept
 		// as a separate, validated phase so the core never fetches arbitrary URLs.
 		return new Skin("NPC_Default", str_repeat("\xc8\xa0\x78\xff", 64 * 64));
