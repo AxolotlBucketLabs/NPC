@@ -137,6 +137,10 @@ final class NpcManager{
 		return $this->definitions;
 	}
 
+	public function getVersion() : string{
+		return $this->plugin->getDescription()->getVersion();
+	}
+
 	public function create(Player $player, string $id, string $displayName) : NpcDefinition{
 		$definition = new NpcDefinition(
 			$id,
@@ -236,6 +240,25 @@ final class NpcManager{
 		return true;
 	}
 
+	public function removeCommand(string $id, string $command) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		$command = trim($command);
+		if($definition === null || $command === ""){
+			return false;
+		}
+		$original = $definition->getCommands();
+		$commands = array_values(array_filter(
+			$original,
+			static fn(string $configured) : bool => $configured !== $command
+		));
+		if(count($commands) === count($original)){
+			return false;
+		}
+		$definition->setCommands($commands);
+		$this->save();
+		return true;
+	}
+
 	public function setEquipment(string $id, string $slot, string $item) : bool{
 		$definition = $this->definitions[$id] ?? null;
 		if($definition === null || !$definition->setEquipmentSlot($slot, $item)){
@@ -279,6 +302,36 @@ final class NpcManager{
 		}
 		$definition->setCooldown($seconds);
 		$this->save();
+		return true;
+	}
+
+	public function setScale(string $id, float $scale) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		$definition->setScale($scale);
+		$this->save();
+		$this->respawn($id);
+		return true;
+	}
+
+	public function move(Player $player, string $id) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		$location = $player->getLocation();
+		$definition->setLocation(
+			$player->getWorld()->getFolderName(),
+			$location->x,
+			$location->y,
+			$location->z,
+			$location->yaw,
+			$location->pitch
+		);
+		$this->save();
+		$this->respawn($id);
 		return true;
 	}
 

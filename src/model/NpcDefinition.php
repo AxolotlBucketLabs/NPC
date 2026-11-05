@@ -149,6 +149,14 @@ final class NpcDefinition{
 	public function setParticle(bool $particle) : void{ $this->particle = $particle; }
 	public function setSound(bool $sound) : void{ $this->sound = $sound; }
 	public function setScale(float $scale) : void{ $this->scale = self::normalizeScale($scale); }
+	public function setLocation(string $world, float $x, float $y, float $z, float $yaw, float $pitch) : void{
+		$this->world = trim($world);
+		$this->x = $x;
+		$this->y = $y;
+		$this->z = $z;
+		$this->yaw = $yaw;
+		$this->pitch = $pitch;
+	}
 	/** @param array<int|string, mixed> $equipment */
 	public function setEquipment(array $equipment) : void{ $this->equipment = self::normalizeEquipment($equipment); }
 	public function setEquipmentSlot(string $slot, string $item) : bool{

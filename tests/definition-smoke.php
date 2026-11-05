@@ -33,6 +33,12 @@ if($roundTrip->getCommands() !== ["console: say {player}"] || !$roundTrip->isRot
 	throw new RuntimeException("NpcDefinition round trip failed");
 }
 
+$roundTrip->setScale(9.0);
+$roundTrip->setLocation("lobby", 1.5, 70.0, -2.5, 90.0, 0.0);
+if($roundTrip->getScale() !== 4.0 || $roundTrip->getWorld() !== "lobby" || $roundTrip->getX() !== 1.5 || $roundTrip->getYaw() !== 90.0){
+	throw new RuntimeException("NpcDefinition location and scale mutation failed");
+}
+
 try{
 	new NpcDefinition("unsafe id", "world", 0, 0, 0, 0, 0, ["bad"]);
 	throw new RuntimeException("Unsafe NPC id was accepted");

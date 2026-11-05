@@ -11,7 +11,9 @@ use pocketmine\utils\TextFormat;
 use function array_shift;
 use function count;
 use function implode;
+use function in_array;
 use function is_numeric;
+use function str_replace;
 use function strtolower;
 use function trim;
 
@@ -30,6 +32,11 @@ final class NpcCommandHandler{
 		}
 
 		switch($subcommand){
+			case "spawn": case "add": case "make": return $this->spawn($sender, $args);
+			case "edit": return $this->edit($sender, $args);
+			case "entities": return $this->entities($sender);
+			case "version": $sender->sendMessage(TextFormat::GREEN . "NPC " . $this->manager->getVersion()); return true;
+			case "cancel": $sender->sendMessage(TextFormat::GREEN . "No pending NPC action needs cancelling."); return true;
 			case "create": return $this->create($sender, $args);
 			case "remove": case "delete": return $this->remove($sender, $args);
 			case "setname": return $this->setName($sender, $args);
@@ -39,6 +46,7 @@ final class NpcCommandHandler{
 			case "equipment": return $this->equipment($sender, $args);
 			case "skin": return $this->skin($sender, $args);
 			case "cooldown": return $this->cooldown($sender, $args);
+			case "scale": return $this->scale($sender, $args);
 			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
 			case "tp": return $this->teleport($sender, $args);
 			case "reload": $this->manager->reload(); $sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded."); return true;
@@ -74,6 +82,8 @@ final class NpcCommandHandler{
 		$sender->sendMessage(TextFormat::AQUA . "NPC commands:");
 		foreach([
 			"/npc create <id> [name]",
+			"/slapper spawn <Human|Player> [name]",
+			"/slapper edit <id> <name|addcommand|delcommand|listcommands|scale|tphere|tpto|equipment>",
 			"/npc remove <id>",
 			"/npc setname <id> <name>",
 			"/npc setline <id> <line> <text>",
@@ -82,6 +92,7 @@ final class NpcCommandHandler{
 			"/npc equipment <id> <hand|helmet|chestplate|leggings|boots> <item|clear>",
 			"/npc skin <id> <relative-raw-skin-file|clear>",
 			"/npc cooldown <id> <seconds>",
+			"/npc scale <id> <size>",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc debug | /npc reload"
 		] as $line){
@@ -96,6 +107,135 @@ final class NpcCommandHandler{
 		foreach($definitions as $id => $definition){
 			$sender->sendMessage(TextFormat::GRAY . "- " . $id . " @ " . $definition->getWorld());
 		}
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function spawn(CommandSender $sender, array $args) : bool{
+		if(!$sender instanceof Player || count($args) < 1){
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /slapper spawn <Human|Player> [name]");
+			return true;
+		}
+		$type = strtolower((string) array_shift($args));
+		if(!in_array($type, ["human", "player"], true)){
+			$sender->sendMessage(TextFormat::RED . "This compatibility layer currently supports Human/Player NPCs only. Use /npc create for the same core.");
+			return true;
+		}
+		$name = trim(implode(" ", $args));
+		$name = str_replace(["{color}", "{line}"], ["§", "\n"], $name);
+		if($name === ""){
+			$name = $sender->getDisplayName();
+		}
+		$id = $this->nextId();
+		try{
+			$this->manager->create($sender, $id, $name);
+			$sender->sendMessage(TextFormat::GREEN . "Human NPC '$id' spawned here.");
+		}catch(\Throwable $error){
+			$sender->sendMessage(TextFormat::RED . $error->getMessage());
+		}
+		return true;
+	}
+
+	private function nextId() : string{
+		$number = 1;
+		while($this->manager->getDefinition("npc_" . $number) !== null){
+			++$number;
+		}
+		return "npc_" . $number;
+	}
+
+	/** @param list<string> $args */
+	private function edit(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$edit = strtolower(array_shift($args) ?? "");
+		if($id === null || $edit === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /slapper edit <id> <property> [value]");
+			return true;
+		}
+		switch($edit){
+			case "name": case "customname":
+				return $this->setName($sender, [$id, ...$args]);
+			case "addcommand": case "addc": case "adduced":
+				return $this->addCommand($sender, [$id, ...$args]);
+			case "delcommand": case "delc": case "delcmd": case "remove": case "removecommand":
+				return $this->removeCommand($sender, $id, $args);
+			case "listcommands": case "listcmds": case "listcs":
+				return $this->listCommands($sender, $id);
+			case "helm": case "helmet": case "head": case "hat": case "cap":
+				return $this->equipment($sender, [$id, "helmet", ...$args]);
+			case "chest": case "shirt": case "chestplate":
+				return $this->equipment($sender, [$id, "chestplate", ...$args]);
+			case "pants": case "legs": case "leggings":
+				return $this->equipment($sender, [$id, "leggings", ...$args]);
+			case "feet": case "boots": case "shoes":
+				return $this->equipment($sender, [$id, "boots", ...$args]);
+			case "item": case "hand": case "holding": case "arm": case "held":
+				return $this->equipment($sender, [$id, "hand", ...$args]);
+			case "scale":
+				return $this->scale($sender, [$id, ...$args]);
+			case "tphere": case "teleporthere": case "movehere": case "bringer":
+				if(!$sender instanceof Player){
+					$sender->sendMessage(TextFormat::RED . "This edit action must be run by a player.");
+					return true;
+				}
+				$sender->sendMessage($this->manager->move($sender, $id) ? TextFormat::GREEN . "NPC moved here." : TextFormat::RED . "NPC not found.");
+				return true;
+			case "tpto": case "goto": case "teleport": case "tp":
+				return $this->teleport($sender, [$id]);
+			case "update": case "fix": case "migrate":
+				$this->manager->reload();
+				$sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded.");
+				return true;
+			case "skin":
+				return $this->skin($sender, [$id, ...$args]);
+			case "namevisible": case "customnamevisible": case "tagvisible":
+				$sender->sendMessage(TextFormat::YELLOW . "NPC name tags are always visible in this implementation.");
+				return true;
+			default:
+				$sender->sendMessage(TextFormat::RED . "Unknown edit property. Use /npc help.");
+				return true;
+		}
+	}
+
+	private function entities(CommandSender $sender) : bool{
+		$sender->sendMessage(TextFormat::AQUA . "Supported NPC entity types: Human, Player");
+		$sender->sendMessage(TextFormat::GRAY . "Other historical Slapper entity types are not silently emulated by the Human core.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function removeCommand(CommandSender $sender, string $id, array $args) : bool{
+		$command = trim(implode(" ", $args));
+		if($command === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /slapper edit <id> delcommand <command>");
+			return true;
+		}
+		$sender->sendMessage($this->manager->removeCommand($id, $command) ? TextFormat::GREEN . "NPC action removed." : TextFormat::RED . "NPC or exact action not found.");
+		return true;
+	}
+
+	private function listCommands(CommandSender $sender, string $id) : bool{
+		$definition = $this->manager->getDefinition($id);
+		if($definition === null){
+			$sender->sendMessage(TextFormat::RED . "NPC not found.");
+			return true;
+		}
+		$sender->sendMessage(TextFormat::AQUA . "NPC actions for $id:");
+		foreach($definition->getCommands() as $command){
+			$sender->sendMessage(TextFormat::GRAY . "- " . $command);
+		}
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function scale(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$value = array_shift($args);
+		if($id === null || $value === null || !is_numeric($value)){
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /slapper edit <id> scale <size>");
+			return true;
+		}
+		$sender->sendMessage($this->manager->setScale($id, (float) $value) ? TextFormat::GREEN . "NPC scale updated." : TextFormat::RED . "NPC not found.");
 		return true;
 	}
 
