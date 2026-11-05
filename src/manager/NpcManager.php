@@ -7,6 +7,7 @@ namespace NhanAZ\NPC\manager;
 use NhanAZ\NPC\entity\NpcEntity;
 use NhanAZ\NPC\model\NpcDefinition;
 use pocketmine\console\ConsoleCommandSender;
+use pocketmine\entity\Human;
 use pocketmine\entity\Skin;
 use pocketmine\event\player\PlayerEntityInteractEvent;
 use pocketmine\item\StringToItemParser;
@@ -52,6 +53,7 @@ use function realpath;
 use function rad2deg;
 use function sprintf;
 use function strlen;
+use function str_contains;
 use function str_replace;
 use function str_starts_with;
 use function strtolower;
@@ -332,34 +334,46 @@ final class NpcManager{
 		if($definition === null){
 			return false;
 		}
-		$skin = $player->getSkin();
-		$skinData = $skin->getSkinData();
-		if(!in_array(strlen($skinData), Skin::ACCEPTED_SKIN_SIZES, true)){
+		$stored = $this->persistSkin($player->getSkin(), $id);
+		if($stored === null){
 			$this->plugin->getLogger()->warning("Player skin for NPC '$id' has an unsupported size");
 			return false;
 		}
-		$skinsDirectory = $this->plugin->getDataFolder() . "skins";
-		if(!is_dir($skinsDirectory) && !mkdir($skinsDirectory, 0775, true) && !is_dir($skinsDirectory)){
-			return false;
-		}
-		$skinFile = $id . ".rgba";
-		if(file_put_contents($skinsDirectory . DIRECTORY_SEPARATOR . $skinFile, $skinData, LOCK_EX) === false){
-			return false;
-		}
-		$definition->setSkinFile($skinFile);
-		$capeData = $skin->getCapeData();
-		if(strlen($capeData) === 8192){
-			$capeFile = $id . ".cape.rgba";
-			if(file_put_contents($skinsDirectory . DIRECTORY_SEPARATOR . $capeFile, $capeData, LOCK_EX) !== false){
-				$definition->setCapeFile($capeFile);
-			}
-		}else{
-			$definition->setCapeFile("");
-		}
-		$definition->setGeometry($skin->getGeometryName(), $skin->getGeometryData());
+		$definition->setSkinFile($stored["skin"]);
+		$definition->setCapeFile($stored["cape"]);
+		$definition->setGeometry($stored["geometry-name"], $stored["geometry-data"]);
 		$this->save();
 		$this->respawn($id);
 		return true;
+	}
+
+	/** @return array{skin: string, cape: string, geometry-name: string, geometry-data: string}|null */
+	private function persistSkin(Skin $skin, string $baseName) : ?array{
+		$skinData = $skin->getSkinData();
+		if(!in_array(strlen($skinData), Skin::ACCEPTED_SKIN_SIZES, true)){
+			return null;
+		}
+		$skinsDirectory = $this->plugin->getDataFolder() . "skins";
+		if(!is_dir($skinsDirectory) && !mkdir($skinsDirectory, 0775, true) && !is_dir($skinsDirectory)){
+			return null;
+		}
+		$skinFile = $baseName . ".rgba";
+		if(file_put_contents($skinsDirectory . DIRECTORY_SEPARATOR . $skinFile, $skinData, LOCK_EX) === false){
+			return null;
+		}
+		$capeFile = "";
+		if(strlen($skin->getCapeData()) === 8192){
+			$capeFile = $baseName . ".cape.rgba";
+			if(file_put_contents($skinsDirectory . DIRECTORY_SEPARATOR . $capeFile, $skin->getCapeData(), LOCK_EX) === false){
+				$capeFile = "";
+			}
+		}
+		return [
+			"skin" => $skinFile,
+			"cape" => $capeFile,
+			"geometry-name" => $skin->getGeometryName(),
+			"geometry-data" => $skin->getGeometryData()
+		];
 	}
 
 	public function setBoolean(string $id, string $field, bool $value) : bool{
@@ -415,6 +429,101 @@ final class NpcManager{
 		$this->save();
 		$this->respawn($id);
 		return true;
+	}
+
+	/** @return array{imported: int, skipped: int, removed: int, errors: int} */
+	public function migrateSlapper(bool $removeOld = false) : array{
+		$result = ["imported" => 0, "skipped" => 0, "removed" => 0, "errors" => 0];
+		foreach($this->plugin->getServer()->getWorldManager()->getWorlds() as $world){
+			foreach($world->getEntities() as $entity){
+				$entityType = strtolower(get_debug_type($entity));
+				if(!str_contains($entityType, "slapper")){
+					continue;
+				}
+				if(!$entity instanceof Human){
+					++$result["skipped"];
+					$this->plugin->getLogger()->warning("Skipped non-Human Slapper entity " . $entityType . " (NPC currently imports Human only)");
+					continue;
+				}
+				try{
+					$id = $this->nextMigrationId($entity->getId());
+					$location = $entity->getLocation();
+					$name = trim($entity->getNameTag());
+					$definition = new NpcDefinition(
+						$id,
+						$entity->getWorld()->getFolderName(),
+						$location->x,
+						$location->y,
+						$location->z,
+						$location->yaw,
+						$location->pitch,
+						[$name === "" ? "NPC" : $name],
+						$this->optionalListCall($entity, "getCommands"),
+						0.0,
+						false,
+						false,
+						true,
+						$entity->getScale(),
+						$this->readHumanEquipment($entity)
+					);
+					$stored = $this->persistSkin($entity->getSkin(), $id);
+					if($stored !== null){
+						$definition->setSkinFile($stored["skin"]);
+						$definition->setCapeFile($stored["cape"]);
+						$definition->setGeometry($stored["geometry-name"], $stored["geometry-data"]);
+					}
+					$this->definitions[$id] = $definition;
+					$this->spawn($definition);
+					++$result["imported"];
+					if($removeOld){
+						$entity->close();
+						++$result["removed"];
+					}
+				}catch(\Throwable $error){
+					++$result["errors"];
+					$this->plugin->getLogger()->warning("Failed to migrate Slapper entity: " . $error->getMessage());
+				}
+			}
+		}
+		if($result["imported"] > 0){
+			$this->save();
+		}
+		return $result;
+	}
+
+	private function nextMigrationId(int $entityId) : string{
+		$base = "slapper_" . $entityId;
+		$id = $base;
+		$suffix = 1;
+		while(isset($this->definitions[$id])){
+			$tail = "_" . $suffix;
+			$id = substr($base, 0, 32 - strlen($tail)) . $tail;
+			++$suffix;
+		}
+		return $id;
+	}
+
+	/** @return array<string, string> */
+	private function readHumanEquipment(Human $entity) : array{
+		$equipment = [];
+		$items = [
+			"hand" => $entity->getInventory()->getItemInHand(),
+			"helmet" => $entity->getArmorInventory()->getHelmet(),
+			"chestplate" => $entity->getArmorInventory()->getChestplate(),
+			"leggings" => $entity->getArmorInventory()->getLeggings(),
+			"boots" => $entity->getArmorInventory()->getBoots()
+		];
+		$parser = StringToItemParser::getInstance();
+		foreach($items as $slot => $item){
+			if($item->isNull()){
+				continue;
+			}
+			$aliases = $parser->lookupAliases($item);
+			if(isset($aliases[0])){
+				$equipment[$slot] = $aliases[0];
+			}
+		}
+		return $equipment;
 	}
 
 	public function teleport(Player $player, string $id) : bool{
@@ -619,6 +728,24 @@ final class NpcManager{
 		}
 		$result = (\Closure::fromCallable([$target, $method]))(...$arguments);
 		return is_int($result) || is_float($result) || is_string($result) ? $result : null;
+	}
+
+	/** @return list<string> */
+	private function optionalListCall(object $target, string $method) : array{
+		if(!is_callable([$target, $method])){
+			return [];
+		}
+		$result = (\Closure::fromCallable([$target, $method]))();
+		if(!is_array($result)){
+			return [];
+		}
+		$values = [];
+		foreach($result as $value){
+			if(is_string($value) && trim($value) !== ""){
+				$values[] = trim($value);
+			}
+		}
+		return $values;
 	}
 
 	private function createParticle(string $type) : Particle{

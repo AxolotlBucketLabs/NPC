@@ -108,13 +108,21 @@ The `/slapper` command alias accepts the historical Human/Player workflow withou
 /slapper edit <id> tpto
 ```
 
-The compatibility layer deliberately reports unsupported historical entity types instead of pretending they are equivalent to a Human. Entity-ID hit/remove sessions, menu-name player-list entries, and automatic migration of old world-entity NBT are not implemented yet; use the stable string ID from `/npc list` for edits.
+The compatibility layer deliberately reports unsupported historical entity types instead of pretending they are equivalent to a Human. Entity-ID hit/remove sessions and menu-name player-list entries are not implemented yet; use the stable string ID from `/npc list` for edits.
+
+When the old Slapper plugin is still installed and its entities are loaded, an operator can import the Human entities with:
+
+```text
+/npc migrate-slapper
+```
+
+The command copies location, nametag, commands, scale, hand/armor aliases, skin/cape/geometry, and creates persistent NPC definitions. It keeps the old entities by default so the result can be checked first. After verification, `/npc migrate-slapper remove` closes only the successfully imported old entities. If Slapper is absent or its entities were not loaded, the command safely reports zero imports; it does not attempt to parse arbitrary world files.
 
 ## Compatibility boundary
 
 The core deliberately has no hard dependency on PureChat, PurePerms, ScoreHud, EcoAPI, SimpleEconomy, TownCoins, or TownEconomy. This lets it load when those plugins are absent and avoids coupling NPC persistence to another plugin's storage format.
 
-The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. Dedicated typed adapters, ScoreHud tag registration, forms, migration from old Slapper data, non-Human entity types, and full addon parity still require separate integration tests. Until those tests exist, this README does not claim full replacement compatibility with every historical Slapper extension.
+The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. ScoreHud tag registration, forms, non-Human entity types, old entity-ID sessions, and full addon parity still require separate integration tests. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter. Until those tests exist, this README does not claim full replacement compatibility with every historical Slapper extension.
 
 The old Slapper repositories and Poggit Archive pages supplied for this project are treated as feature references only. No source code has been copied into this implementation; license and API behavior will be reviewed separately for each future adapter.
 

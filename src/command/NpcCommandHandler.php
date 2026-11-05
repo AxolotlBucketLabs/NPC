@@ -34,6 +34,7 @@ final class NpcCommandHandler{
 		switch($subcommand){
 			case "spawn": case "add": case "make": return $this->spawn($sender, $args);
 			case "edit": return $this->edit($sender, $args);
+			case "migrate-slapper": return $this->migrateSlapper($sender, $args);
 			case "entities": return $this->entities($sender);
 			case "version": $sender->sendMessage(TextFormat::GREEN . "NPC " . $this->manager->getVersion()); return true;
 			case "cancel": $sender->sendMessage(TextFormat::GREEN . "No pending NPC action needs cancelling."); return true;
@@ -86,6 +87,7 @@ final class NpcCommandHandler{
 			"/npc create <id> [name]",
 			"/slapper spawn <Human|Player> [name]",
 			"/slapper edit <id> <name|addcommand|delcommand|listcommands|scale|tphere|tpto|equipment>",
+			"/npc migrate-slapper [remove]",
 			"/npc remove <id>",
 			"/npc setname <id> <name>",
 			"/npc setline <id> <line> <text>",
@@ -204,6 +206,17 @@ final class NpcCommandHandler{
 	private function entities(CommandSender $sender) : bool{
 		$sender->sendMessage(TextFormat::AQUA . "Supported NPC entity types: Human, Player");
 		$sender->sendMessage(TextFormat::GRAY . "Other historical Slapper entity types are not silently emulated by the Human core.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function migrateSlapper(CommandSender $sender, array $args) : bool{
+		$removeOld = strtolower(array_shift($args) ?? "") === "remove";
+		$result = $this->manager->migrateSlapper($removeOld);
+		$sender->sendMessage(TextFormat::GREEN . "Slapper migration imported=" . $result["imported"] . " skipped=" . $result["skipped"] . " errors=" . $result["errors"] . " removed=" . $result["removed"]);
+		if(!$removeOld && $result["imported"] > 0){
+			$sender->sendMessage(TextFormat::YELLOW . "Old Slapper entities were kept. Check the imported NPCs before running /npc migrate-slapper remove.");
+		}
 		return true;
 	}
 
