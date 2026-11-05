@@ -10,8 +10,10 @@ use NhanAZ\NPC\manager\NpcManager;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
 use pocketmine\event\Listener;
+use pocketmine\event\entity\EntityDamageByEntityEvent;
 use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\event\player\PlayerEntityInteractEvent;
+use pocketmine\player\Player;
 use pocketmine\plugin\PluginBase;
 use pocketmine\scheduler\ClosureTask;
 
@@ -57,8 +59,12 @@ final class Main extends PluginBase implements Listener{
 	}
 
 	public function onEntityDamage(EntityDamageEvent $event) : void{
-		if($event->getEntity() instanceof NpcEntity){
+		$entity = $event->getEntity();
+		if($entity instanceof NpcEntity){
 			$event->cancel();
+			if($event instanceof EntityDamageByEntityEvent && $event->getDamager() instanceof Player){
+				$this->npcManager->handleHit($entity, $event->getDamager());
+			}
 		}
 	}
 }

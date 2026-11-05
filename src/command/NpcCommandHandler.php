@@ -32,12 +32,15 @@ final class NpcCommandHandler{
 		}
 
 		switch($subcommand){
+			case "id": return $this->idSession($sender);
 			case "spawn": case "add": case "make": return $this->spawn($sender, $args);
 			case "edit": return $this->edit($sender, $args);
 			case "migrate-slapper": return $this->migrateSlapper($sender, $args);
 			case "entities": return $this->entities($sender);
 			case "version": $sender->sendMessage(TextFormat::GREEN . "NPC " . $this->manager->getVersion()); return true;
-			case "cancel": $sender->sendMessage(TextFormat::GREEN . "No pending NPC action needs cancelling."); return true;
+			case "cancel": case "stopid": case "stopremove":
+				$sender->sendMessage($sender instanceof Player && $this->manager->cancelSession($sender) ? TextFormat::GREEN . "Cancelled." : TextFormat::GREEN . "No pending NPC action needs cancelling.");
+				return true;
 			case "create": return $this->create($sender, $args);
 			case "remove": case "delete": return $this->remove($sender, $args);
 			case "setname": return $this->setName($sender, $args);
@@ -277,10 +280,25 @@ final class NpcCommandHandler{
 	private function remove(CommandSender $sender, array $args) : bool{
 		$id = array_shift($args);
 		if($id === null){
-			$sender->sendMessage(TextFormat::YELLOW . "Usage: /npc remove <id>");
+			if($sender instanceof Player){
+				$this->manager->startRemoveSession($sender);
+				$sender->sendMessage(TextFormat::YELLOW . "Hit an NPC to remove it, or use /npc cancel.");
+			}else{
+				$sender->sendMessage(TextFormat::YELLOW . "Usage: /npc remove <id>");
+			}
 			return true;
 		}
 		$sender->sendMessage($this->manager->remove($id) ? TextFormat::GREEN . "NPC removed." : TextFormat::RED . "NPC not found.");
+		return true;
+	}
+
+	private function idSession(CommandSender $sender) : bool{
+		if(!$sender instanceof Player){
+			$sender->sendMessage(TextFormat::RED . "This compatibility command must be run by a player.");
+			return true;
+		}
+		$this->manager->startIdSession($sender);
+		$sender->sendMessage(TextFormat::YELLOW . "Hit an NPC to get its ID, or use /npc cancel.");
 		return true;
 	}
 

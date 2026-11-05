@@ -23,6 +23,7 @@ The first deployable milestone includes:
 - `{balance}`, `{money}` and `{coins}` when SimpleEconomy, EcoAPI, TownCoins, or TownEconomy exposes a compatible scalar getter;
 - `/slapper` as a command alias and a guarded `/rca <player> <command>` compatibility command;
 - a compatibility command surface for `/slapper spawn Human`, `/slapper edit`, `entities`, `version`, and `cancel`;
+- hit-session compatibility for `/slapper id`, `/slapper remove`, `/slapper cancel`, and left-click command actions;
 - edit aliases for names, commands, hand/armor equipment, scale, reload, and teleporting an NPC or player;
 - DevTools PHAR packaging and PHPStan Level Max in CI.
 
@@ -50,6 +51,8 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc tp <id>
 /npc list
 /npc debug
+/npc id
+/npc cancel
 /npc reload
 /rca <player> <command>
 ```
@@ -108,7 +111,7 @@ The `/slapper` command alias accepts the historical Human/Player workflow withou
 /slapper edit <id> tpto
 ```
 
-The compatibility layer deliberately reports unsupported historical entity types instead of pretending they are equivalent to a Human. Entity-ID hit/remove sessions and menu-name player-list entries are not implemented yet; use the stable string ID from `/npc list` for edits.
+The compatibility layer deliberately reports unsupported historical entity types instead of pretending they are equivalent to a Human. `/npc id` (or `/slapper id`) waits for a hit and reports both the stable NPC ID and the current network entity ID. `/npc remove` without an ID waits for a hit and removes only the selected NPC definition; `/npc cancel` clears the pending session. Right-click and left-click both run the configured actions, subject to the same cooldown.
 
 When the old Slapper plugin is still installed and its entities are loaded, an operator can import the Human entities with:
 
@@ -122,7 +125,7 @@ The command copies location, nametag, commands, scale, hand/armor aliases, skin/
 
 The core deliberately has no hard dependency on PureChat, PurePerms, ScoreHud, EcoAPI, SimpleEconomy, TownCoins, or TownEconomy. This lets it load when those plugins are absent and avoids coupling NPC persistence to another plugin's storage format.
 
-The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. ScoreHud tag registration, forms, non-Human entity types, old entity-ID sessions, and full addon parity still require separate integration tests. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter. Until those tests exist, this README does not claim full replacement compatibility with every historical Slapper extension.
+The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. ScoreHud tag registration, forms, non-Human entity types, menu-name player-list entries, and full addon parity still require separate integration tests. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter. Until those tests exist, this README does not claim full replacement compatibility with every historical Slapper extension.
 
 The old Slapper repositories and Poggit Archive pages supplied for this project are treated as feature references only. No source code has been copied into this implementation; license and API behavior will be reviewed separately for each future adapter.
 

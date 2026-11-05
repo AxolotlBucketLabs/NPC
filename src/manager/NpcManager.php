@@ -70,6 +70,12 @@ final class NpcManager{
 	/** @var array<string, array<string, float>> */
 	private array $cooldowns = [];
 
+	/** @var array<string, true> */
+	private array $idSessions = [];
+
+	/** @var array<string, true> */
+	private array $removeSessions = [];
+
 	private string $dataFile;
 
 	public function __construct(private Main $plugin){
@@ -123,6 +129,8 @@ final class NpcManager{
 			}
 		}
 		$this->entities = [];
+		$this->idSessions = [];
+		$this->removeSessions = [];
 	}
 
 	public function tick() : void{
@@ -540,11 +548,52 @@ final class NpcManager{
 			return;
 		}
 		$event->cancel();
+		$this->handleInteraction($entity, $event->getPlayer());
+	}
+
+	public function handleHit(NpcEntity $entity, Player $player) : void{
+		if(!isset($this->entities[$entity->getNpcId()])){
+			return;
+		}
+		$playerKey = strtolower($player->getName());
+		if(isset($this->removeSessions[$playerKey])){
+			unset($this->removeSessions[$playerKey], $this->idSessions[$playerKey]);
+			$this->remove($entity->getNpcId());
+			$player->sendMessage(TextFormat::GREEN . "NPC '" . $entity->getNpcId() . "' removed.");
+			return;
+		}
+		if(isset($this->idSessions[$playerKey])){
+			unset($this->idSessions[$playerKey]);
+			$player->sendMessage(TextFormat::GREEN . "NPC ID: " . $entity->getNpcId() . " (entity ID: " . $entity->getId() . ")");
+			return;
+		}
+		$this->handleInteraction($entity, $player);
+	}
+
+	public function startIdSession(Player $player) : void{
+		$playerKey = strtolower($player->getName());
+		$this->idSessions[$playerKey] = true;
+		unset($this->removeSessions[$playerKey]);
+	}
+
+	public function startRemoveSession(Player $player) : void{
+		$playerKey = strtolower($player->getName());
+		$this->removeSessions[$playerKey] = true;
+		unset($this->idSessions[$playerKey]);
+	}
+
+	public function cancelSession(Player $player) : bool{
+		$playerKey = strtolower($player->getName());
+		$hadSession = isset($this->idSessions[$playerKey]) || isset($this->removeSessions[$playerKey]);
+		unset($this->idSessions[$playerKey], $this->removeSessions[$playerKey]);
+		return $hadSession;
+	}
+
+	private function handleInteraction(NpcEntity $entity, Player $player) : void{
 		$definition = $this->definitions[$entity->getNpcId()] ?? null;
 		if($definition === null){
 			return;
 		}
-		$player = $event->getPlayer();
 		$now = microtime(true);
 		$playerKey = strtolower($player->getName());
 		$last = $this->cooldowns[$definition->getId()][$playerKey] ?? 0.0;
