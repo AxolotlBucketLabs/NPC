@@ -37,11 +37,15 @@ $roundTrip->setScale(9.0);
 $roundTrip->setLocation("lobby", 1.5, 70.0, -2.5, 90.0, 0.0);
 $roundTrip->setParticleType("happy-villager");
 $roundTrip->setSoundType("door-bump");
+$roundTrip->setMenuName("Lobby NPC");
 if($roundTrip->getScale() !== 4.0 || $roundTrip->getWorld() !== "lobby" || $roundTrip->getX() !== 1.5 || $roundTrip->getYaw() !== 90.0){
 	throw new RuntimeException("NpcDefinition location and scale mutation failed");
 }
 if($roundTrip->getParticleType() !== "happy_villager" || $roundTrip->getSoundType() !== "door_bump"){
 	throw new RuntimeException("NpcDefinition effect type normalization failed");
+}
+if($roundTrip->getMenuName() !== "Lobby NPC" || NpcDefinition::fromArray("welcome", $roundTrip->toArray())->getMenuName() !== "Lobby NPC"){
+	throw new RuntimeException("NpcDefinition menu name round trip failed");
 }
 
 try{

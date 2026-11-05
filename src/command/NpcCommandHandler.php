@@ -53,6 +53,7 @@ final class NpcCommandHandler{
 			case "scale": return $this->scale($sender, $args);
 			case "particle-type": return $this->effectType($sender, "particle", $args);
 			case "sound-type": case "hitsound": return $this->effectType($sender, "sound", $args);
+			case "menuname": case "menu-name": return $this->menuName($sender, $args);
 			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
 			case "tp": return $this->teleport($sender, $args);
 			case "reload": $this->manager->reload(); $sender->sendMessage(TextFormat::GREEN . "NPC definitions reloaded."); return true;
@@ -102,6 +103,7 @@ final class NpcCommandHandler{
 			"/npc scale <id> <size>",
 			"/npc particle-type <id> <flame|heart|smoke|...>",
 			"/npc sound-type <id> <click|pop|door_bump|...>",
+			"/npc menuname <id> <name|remove>",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc debug | /npc reload"
 		] as $line){
@@ -197,6 +199,8 @@ final class NpcCommandHandler{
 				return true;
 			case "skin":
 				return $this->skin($sender, [$id, ...$args]);
+			case "menuname": case "menu-name":
+				return $this->menuName($sender, [$id, ...$args]);
 			case "namevisible": case "customnamevisible": case "tagvisible":
 				$sender->sendMessage(TextFormat::YELLOW . "NPC name tags are always visible in this implementation.");
 				return true;
@@ -394,6 +398,22 @@ final class NpcCommandHandler{
 		}
 		$ok = $this->manager->setEffectType($id, $field, $type);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC " . $field . " type updated." : TextFormat::RED . "NPC or effect type is invalid.");
+		return true;
+	}
+
+	/** @param list<string> $args */
+	private function menuName(CommandSender $sender, array $args) : bool{
+		$id = array_shift($args);
+		$name = trim(implode(" ", $args));
+		if($id === null || $name === ""){
+			$sender->sendMessage(TextFormat::YELLOW . "/npc menuname <id> <name|remove>");
+			return true;
+		}
+		if(in_array(strtolower($name), ["remove", "clear", "none"], true)){
+			$name = "";
+		}
+		$ok = $this->manager->setMenuName($id, $name);
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC menu name updated." : TextFormat::RED . "NPC not found.");
 		return true;
 	}
 

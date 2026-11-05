@@ -222,7 +222,7 @@ final class NpcManager{
 			$definition->getYaw(),
 			$definition->getPitch()
 		);
-		$entity = new NpcEntity($location, $definition->getId(), $this->loadSkin($definition));
+		$entity = new NpcEntity($location, $definition->getId(), $this->loadSkin($definition), $definition->getMenuName());
 		$entity->setScale($definition->getScale());
 		$this->applyEquipment($entity, $definition);
 		$entity->setNameTag($this->renderLines($definition));
@@ -281,6 +281,20 @@ final class NpcManager{
 				break;
 			default:
 				return false;
+		}
+		$this->save();
+		return true;
+	}
+
+	public function setMenuName(string $id, string $menuName) : bool{
+		$definition = $this->definitions[$id] ?? null;
+		if($definition === null){
+			return false;
+		}
+		$definition->setMenuName($menuName);
+		$entity = $this->entities[$id] ?? null;
+		if($entity !== null && !$entity->isClosed()){
+			$entity->setMenuName($definition->getMenuName());
 		}
 		$this->save();
 		return true;
@@ -472,7 +486,14 @@ final class NpcManager{
 						false,
 						true,
 						$entity->getScale(),
-						$this->readHumanEquipment($entity)
+						$this->readHumanEquipment($entity),
+						"",
+						"",
+						"",
+						"",
+						"flame",
+						"click",
+						$this->optionalStringCall($entity, "getNameName", [])
 					);
 					$stored = $this->persistSkin($entity->getSkin(), $id);
 					if($stored !== null){
@@ -637,7 +658,7 @@ final class NpcManager{
 				$definition->getSkinFile() === "" ? "default" : $definition->getSkinFile(),
 				$definition->getCooldown(),
 				$definition->getParticleType(),
-				$definition->getSoundType()
+				$definition->getSoundType() . " menu=" . ($definition->getMenuName() === "" ? "none" : $definition->getMenuName())
 			);
 		}
 		return $lines;

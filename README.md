@@ -24,6 +24,7 @@ The first deployable milestone includes:
 - `/slapper` as a command alias and a guarded `/rca <player> <command>` compatibility command;
 - a compatibility command surface for `/slapper spawn Human`, `/slapper edit`, `entities`, `version`, and `cancel`;
 - hit-session compatibility for `/slapper id`, `/slapper remove`, `/slapper cancel`, and left-click command actions;
+- Slapper Human `menuname` compatibility using the current Axolotl-PM player-list packet API;
 - edit aliases for names, commands, hand/armor equipment, scale, reload, and teleporting an NPC or player;
 - DevTools PHAR packaging and PHPStan Level Max in CI.
 
@@ -45,6 +46,7 @@ NPC actions are configured by operators only. A player cannot write an action or
 /npc scale <id> <size>
 /npc particle-type <id> <type>
 /npc sound-type <id> <type>
+/npc menuname <id> <name|remove>
 /npc rotate <id> <on|off>
 /npc particle <id> <on|off>
 /npc sound <id> <on|off>
@@ -109,9 +111,10 @@ The `/slapper` command alias accepts the historical Human/Player workflow withou
 /npc sound-type <id> <type>
 /slapper edit <id> tphere
 /slapper edit <id> tpto
+/slapper edit <id> menuname <name|remove>
 ```
 
-The compatibility layer deliberately reports unsupported historical entity types instead of pretending they are equivalent to a Human. `/npc id` (or `/slapper id`) waits for a hit and reports both the stable NPC ID and the current network entity ID. `/npc remove` without an ID waits for a hit and removes only the selected NPC definition; `/npc cancel` clears the pending session. Right-click and left-click both run the configured actions, subject to the same cooldown.
+The compatibility layer deliberately reports unsupported historical entity types instead of pretending they are equivalent to a Human. `/npc id` (or `/slapper id`) waits for a hit and reports both the stable NPC ID and the current network entity ID. `/npc remove` without an ID waits for a hit and removes only the selected NPC definition; `/npc cancel` clears the pending session. Right-click and left-click both run the configured actions, subject to the same cooldown. `/npc menuname <id> <name|remove>` keeps a Human-style NPC in the Bedrock player list with the requested name and removes the row cleanly when disabled.
 
 When the old Slapper plugin is still installed and its entities are loaded, an operator can import the Human entities with:
 
@@ -119,13 +122,13 @@ When the old Slapper plugin is still installed and its entities are loaded, an o
 /npc migrate-slapper
 ```
 
-The command copies location, nametag, commands, scale, hand/armor aliases, skin/cape/geometry, and creates persistent NPC definitions. It keeps the old entities by default so the result can be checked first. After verification, `/npc migrate-slapper remove` closes only the successfully imported old entities. If Slapper is absent or its entities were not loaded, the command safely reports zero imports; it does not attempt to parse arbitrary world files.
+The command copies location, nametag, commands, scale, hand/armor aliases, menu name, skin/cape/geometry, and creates persistent NPC definitions. It keeps the old entities by default so the result can be checked first. After verification, `/npc migrate-slapper remove` closes only the successfully imported old entities. If Slapper is absent or its entities were not loaded, the command safely reports zero imports; it does not attempt to parse arbitrary world files.
 
 ## Compatibility boundary
 
 The core deliberately has no hard dependency on PureChat, PurePerms, ScoreHud, EcoAPI, SimpleEconomy, TownCoins, or TownEconomy. This lets it load when those plugins are absent and avoids coupling NPC persistence to another plugin's storage format.
 
-The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. ScoreHud tag registration, forms, non-Human entity types, menu-name player-list entries, and full addon parity still require separate integration tests. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter. Until those tests exist, this README does not claim full replacement compatibility with every historical Slapper extension.
+The current milestone exposes generic placeholders plus soft adapters for the method shapes used by the current PureChat, PurePerms, SimpleEconomy, EcoAPI, TownCoins, and TownEconomy plugins. ScoreHud tag registration, forms, non-Human entity types, and full addon parity still require separate integration tests. The Slapper migration command intentionally requires the old plugin to have loaded the source entities; it is not a blind world-NBT converter. Until those tests exist, this README does not claim full replacement compatibility with every historical Slapper extension.
 
 The old Slapper repositories and Poggit Archive pages supplied for this project are treated as feature references only. No source code has been copied into this implementation; license and API behavior will be reviewed separately for each future adapter.
 

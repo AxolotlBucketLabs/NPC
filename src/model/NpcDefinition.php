@@ -58,7 +58,8 @@ final class NpcDefinition{
 		private string $geometryName = "",
 		private string $geometryData = "",
 		private string $particleType = "flame",
-		private string $soundType = "click"
+		private string $soundType = "click",
+		private string $menuName = ""
 	){
 		self::validateId($id);
 		$this->lines = self::normalizeLines($lines);
@@ -95,7 +96,8 @@ final class NpcDefinition{
 			self::stringValue($data, "geometry-name", ""),
 			self::stringValue($data, "geometry-data", ""),
 			self::stringValue($data, "particle-type", "flame"),
-			self::stringValue($data, "sound-type", "click")
+			self::stringValue($data, "sound-type", "click"),
+			self::stringValue($data, "menu-name", "")
 		);
 	}
 
@@ -121,7 +123,8 @@ final class NpcDefinition{
 			"geometry-name" => $this->geometryName,
 			"geometry-data" => $this->geometryData,
 			"particle-type" => $this->particleType,
-			"sound-type" => $this->soundType
+			"sound-type" => $this->soundType,
+			"menu-name" => $this->menuName
 		];
 	}
 
@@ -149,6 +152,7 @@ final class NpcDefinition{
 	public function getGeometryData() : string{ return $this->geometryData; }
 	public function getParticleType() : string{ return $this->particleType; }
 	public function getSoundType() : string{ return $this->soundType; }
+	public function getMenuName() : string{ return $this->menuName; }
 
 	/** @param array<int|string, mixed> $lines */
 	public function setLines(array $lines) : void{ $this->lines = self::normalizeLines($lines); }
@@ -189,6 +193,10 @@ final class NpcDefinition{
 	}
 	public function setParticleType(string $type) : void{ $this->particleType = self::normalizeEffectName($type, "flame"); }
 	public function setSoundType(string $type) : void{ $this->soundType = self::normalizeEffectName($type, "click"); }
+	public function setMenuName(string $menuName) : void{
+		$menuName = str_replace(["\r", "\n"], " ", trim($menuName));
+		$this->menuName = substr($menuName, 0, 128);
+	}
 
 	private static function validateId(string $id) : void{
 		if(preg_match('/^[A-Za-z0-9._-]{1,32}$/D', $id) !== 1){
