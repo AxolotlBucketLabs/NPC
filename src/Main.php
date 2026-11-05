@@ -58,6 +58,9 @@ final class Main extends PluginBase implements Listener{
 		}
 	}
 
+	/**
+	 * @handleCancelled
+	 */
 	public function onEntityDamage(EntityDamageEvent $event) : void{
 		$entity = $event->getEntity();
 		if($entity instanceof NpcEntity){
