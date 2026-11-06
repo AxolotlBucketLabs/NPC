@@ -3,8 +3,10 @@
 /build/*.txt
 /vendor/
 /.devtools-virions/
+/.devtools-virions-*/
 /.phpunit.cache/
 /.phpstan-tmp/
 /.phpstan.cache/
 /phpstan.generated.neon
 /.runtime-smoke/
+/.runtime-smoke-*/
