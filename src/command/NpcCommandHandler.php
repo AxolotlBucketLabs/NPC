@@ -33,7 +33,18 @@ final class NpcCommandHandler{
 
 	/** @param list<string> $args */
 	public function handleNpc(CommandSender $sender, array $args) : bool{
-		$subcommand = strtolower(array_shift($args) ?? "help");
+		$subcommand = strtolower(array_shift($args) ?? "");
+		if($subcommand === ""){
+			if(!$sender instanceof Player){
+				return $this->help($sender);
+			}
+			if(!$sender->hasPermission("npc.admin")){
+				$sender->sendMessage(TextFormat::RED . "You do not have permission to open the NPC UI.");
+				return true;
+			}
+			$this->ui->openMain($sender);
+			return true;
+		}
 		if(in_array($subcommand, ["help", "list"], true)){
 			return $subcommand === "help" ? $this->help($sender) : $this->list($sender);
 		}
@@ -59,9 +70,9 @@ final class NpcCommandHandler{
 		$idFirstCommands = [
 			"edit", "remove", "delete", "setname", "setline", "addcommand", "clearcommands",
 			"equipment", "skin", "skin-url", "cooldown", "scale", "particle-type", "sound-type",
-			"hitsound", "menuname", "menu-name", "type", "entity-type", "animation", "emote",
+			"hitsound", "type", "entity-type", "animation", "emote",
 			"hitcommand", "interactcommand", "interaction-mode", "rotation-distance", "playercount",
-			"block", "walk", "random-emote", "rotate", "particle", "sound", "namevisible",
+			"block", "random-emote", "rotate", "particle", "sound", "namevisible",
 			"namevisibility", "customnamevisible", "tagvisible", "tp"
 		];
 		if(in_array($subcommand, $idFirstCommands, true) && isset($args[0])){
@@ -72,7 +83,6 @@ final class NpcCommandHandler{
 			case "id": return $this->idSession($sender);
 			case "spawn": case "add": case "make": return $this->spawn($sender, $args);
 			case "edit": return $this->edit($sender, $args);
-			case "migrate-slapper": return $this->migrateSlapper($sender, $args);
 			case "entities": return $this->entities($sender);
 			case "updateall": return $this->updateAll($sender);
 			case "version": $sender->sendMessage(TextFormat::GREEN . "NPC " . $this->manager->getVersion()); return true;
@@ -92,7 +102,6 @@ final class NpcCommandHandler{
 			case "scale": return $this->scale($sender, $args);
 			case "particle-type": return $this->effectType($sender, "particle", $args);
 			case "sound-type": case "hitsound": return $this->effectType($sender, "sound", $args);
-			case "menuname": case "menu-name": return $this->menuName($sender, $args);
 			case "type": case "entity-type": return $this->entityType($sender, $args);
 			case "animation": return $this->animation($sender, $args);
 			case "emote": return $this->emote($sender, $args);
@@ -103,7 +112,6 @@ final class NpcCommandHandler{
 			case "rotation-distance": return $this->rotationDistance($sender, $args);
 			case "playercount": return $this->playerCount($sender, $args);
 			case "block": return $this->block($sender, $args);
-			case "walk": return $this->walk($sender, $args);
 			case "random-emote": return $this->randomEmote($sender, $args);
 			case "rotate": case "particle": case "sound": return $this->toggle($sender, $subcommand, $args);
 			case "namevisible": return $this->toggle($sender, "nametag", $args);
@@ -142,9 +150,8 @@ final class NpcCommandHandler{
 		$sender->sendMessage(TextFormat::AQUA . "NPC commands:");
 		foreach([
 			"/npc create <id> [name]",
-			"/slapper spawn <entity-type> [name]",
-			"/slapper edit <id> <name|addcommand|delcommand|listcommands|scale|tphere|tpto|equipment>",
-			"/npc migrate-slapper [remove]",
+			"/npc spawn <entity-type> [name]",
+			"/npc edit <id> <name|addcommand|delcommand|listcommands|scale|tphere|tpto|equipment>",
 			"/npc remove <id>",
 			"/npc setname <id> <name>",
 			"/npc setline <id> <line> <text>",
@@ -158,7 +165,6 @@ final class NpcCommandHandler{
 			"/npc scale <id> <size>",
 			"/npc particle-type <id> <flame|heart|smoke|...>",
 			"/npc sound-type <id> <click|pop|door_bump|...>",
-			"/npc menuname <id> <name|remove>",
 			"/npc type <id> <human|any Vanilla mob|boat|minecart|primed_tnt|falling_block>",
 			"/npc animation <id> <none|fly|arm_swing|hurt|critical_hit|magic_critical> [interval] [trigger]",
 			"/npc emote <id> <none|wave|simple_clap|over_there|over_here|bow|saluting|thinking|UUID> [interval] [trigger]",
@@ -169,7 +175,6 @@ final class NpcCommandHandler{
 			"/npc rotation-distance <id> <blocks>",
 			"/npc playercount <id> <none|server|world|query> [world|host] [port]",
 			"/npc block <id> <block-name|legacy-id:meta|clear> (prefer stone or minecraft:stone)",
-			"/npc walk <id> <on|off|add|clear> [speed]",
 			"/npc ui",
 			"/npc rotate|particle|sound <id> <on|off>",
 			"/npc tp <id> | /npc list | /npc entities | /npc updateall | /npc debug | /npc reload"
@@ -191,7 +196,7 @@ final class NpcCommandHandler{
 	/** @param list<string> $args */
 	private function spawn(CommandSender $sender, array $args) : bool{
 		if(!$sender instanceof Player || count($args) < 1){
-			$sender->sendMessage(TextFormat::YELLOW . "Usage: /slapper spawn <Human|Player> [name]");
+			$sender->sendMessage(TextFormat::YELLOW . "Usage: /npc spawn <entity-type> [name]");
 			return true;
 		}
 		$type = strtolower((string) array_shift($args));
@@ -267,8 +272,6 @@ final class NpcCommandHandler{
 				return true;
 			case "skin":
 				return $this->skin($sender, [$id, ...$args]);
-			case "menuname": case "menu-name":
-				return $this->menuName($sender, [$id, ...$args]);
 			case "namevisibility":
 				return $this->nameVisibility($sender, [$id, ...$args]);
 			case "namevisible": case "customnamevisible": case "tagvisible":
@@ -288,17 +291,6 @@ final class NpcCommandHandler{
 
 	private function updateAll(CommandSender $sender) : bool{
 		$sender->sendMessage(TextFormat::GREEN . "Updated " . $this->manager->updateAll() . " NPC definitions to the current schema.");
-		return true;
-	}
-
-	/** @param list<string> $args */
-	private function migrateSlapper(CommandSender $sender, array $args) : bool{
-		$removeOld = strtolower(array_shift($args) ?? "") === "remove";
-		$result = $this->manager->migrateSlapper($removeOld);
-		$sender->sendMessage(TextFormat::GREEN . "Slapper migration imported=" . $result["imported"] . " skipped=" . $result["skipped"] . " errors=" . $result["errors"] . " removed=" . $result["removed"]);
-		if(!$removeOld && $result["imported"] > 0){
-			$sender->sendMessage(TextFormat::YELLOW . "Old Slapper entities were kept. Check the imported NPCs before running /npc migrate-slapper remove.");
-		}
 		return true;
 	}
 
@@ -493,22 +485,6 @@ final class NpcCommandHandler{
 	}
 
 	/** @param list<string> $args */
-	private function menuName(CommandSender $sender, array $args) : bool{
-		$id = array_shift($args);
-		$name = trim(implode(" ", $args));
-		if($id === null || $name === ""){
-			$sender->sendMessage(TextFormat::YELLOW . "/npc menuname <id> <name|remove>");
-			return true;
-		}
-		if(in_array(strtolower($name), ["remove", "clear", "none"], true)){
-			$name = "";
-		}
-		$ok = $this->manager->setMenuName($id, $name);
-		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC menu name updated." : TextFormat::RED . "NPC not found.");
-		return true;
-	}
-
-	/** @param list<string> $args */
 	private function entityType(CommandSender $sender, array $args) : bool{
 		$id = array_shift($args);
 		$type = strtolower(array_shift($args) ?? "");
@@ -659,47 +635,6 @@ final class NpcCommandHandler{
 		}
 		$ok = $this->manager->setBlockId($id, strtolower($block) === "clear" ? "" : $block);
 		$sender->sendMessage($ok ? TextFormat::GREEN . "Block actor updated. Set type to falling_block." : TextFormat::RED . "NPC or block ID is invalid.");
-		return true;
-	}
-
-	/** @param list<string> $args */
-	private function walk(CommandSender $sender, array $args) : bool{
-		$id = array_shift($args);
-		$action = strtolower(array_shift($args) ?? "");
-		$definition = $id !== null ? $this->manager->getDefinition($id) : null;
-		if($id === null || $definition === null){
-			$sender->sendMessage(TextFormat::YELLOW . "/npc walk <id> <on|off|add|clear> [speed]");
-			return true;
-		}
-		if($action === "clear"){
-			$this->manager->setWalkPath($id, []);
-			$sender->sendMessage(TextFormat::GREEN . "Walk path cleared.");
-			return true;
-		}
-		if($action === "add"){
-			if(!$sender instanceof Player){
-				$sender->sendMessage(TextFormat::RED . "Adding a walk point must be done by a player.");
-				return true;
-			}
-			$location = $sender->getLocation();
-			$path = $definition->getWalkPath();
-			$path[] = ["world" => $sender->getWorld()->getFolderName(), "x" => $location->x, "y" => $location->y, "z" => $location->z, "yaw" => $location->yaw, "pitch" => $location->pitch];
-			$this->manager->setWalkPath($id, $path);
-			if(isset($args[0]) && is_numeric($args[0])){
-				$this->manager->setWalkSpeed($id, (float) $args[0]);
-			}
-			$sender->sendMessage(TextFormat::GREEN . "Walk point added. Walking remains off until /npc walk $id on.");
-			return true;
-		}
-		if(!in_array($action, ["on", "off"], true)){
-			$sender->sendMessage(TextFormat::YELLOW . "/npc walk <id> <on|off|add|clear> [speed]");
-			return true;
-		}
-		$ok = $this->manager->setBoolean($id, "walk", $action === "on");
-		if(isset($args[0]) && is_numeric($args[0])){
-			$this->manager->setWalkSpeed($id, (float) $args[0]);
-		}
-		$sender->sendMessage($ok ? TextFormat::GREEN . "Walk mode updated." : TextFormat::RED . "NPC not found.");
 		return true;
 	}
 

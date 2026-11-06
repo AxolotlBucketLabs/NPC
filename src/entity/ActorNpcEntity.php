@@ -10,6 +10,7 @@ use pocketmine\entity\Location;
 use pocketmine\entity\NeverSavedWithChunkEntity;
 use pocketmine\network\mcpe\protocol\AddActorPacket;
 use pocketmine\network\mcpe\protocol\types\entity\Attribute as NetworkAttribute;
+use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataCollection;
 use pocketmine\network\mcpe\protocol\types\entity\PropertySyncData;
 use pocketmine\player\Player;
 use function array_map;
@@ -21,7 +22,8 @@ use function array_values;
  * The server does not give these actors vehicle behaviour, TNT priming or
  * world persistence. They exist only as a client-side model owned by NPC.
  */
-final class ActorNpcEntity extends Entity implements NeverSavedWithChunkEntity{
+final class ActorNpcEntity extends Entity implements NeverSavedWithChunkEntity, NpcNametagVisibility, NpcHeadRotation{
+	use NpcNametagVisibilityTrait, NpcHeadRotationTrait;
 	public function __construct(
 		Location $location,
 		private string $npcId,
@@ -52,6 +54,15 @@ final class ActorNpcEntity extends Entity implements NeverSavedWithChunkEntity{
 		return new EntitySizeInfo($this->width, $this->height);
 	}
 
+	public function canBeMovedByCurrents() : bool{
+		return false;
+	}
+
+	protected function syncNetworkData(EntityMetadataCollection $properties) : void{
+		parent::syncNetworkData($properties);
+		$this->syncNpcNametagVisibility($properties);
+	}
+
 	protected function getInitialDragMultiplier() : float{
 		return 0.0;
 	}
@@ -70,7 +81,7 @@ final class ActorNpcEntity extends Entity implements NeverSavedWithChunkEntity{
 			$this->getMotion(),
 			$this->getLocation()->pitch,
 			$this->getLocation()->yaw,
-			$this->getLocation()->yaw,
+			$this->getNpcHeadYaw(),
 			$this->getLocation()->yaw,
 			array_map(static fn(\pocketmine\entity\Attribute $attribute) : NetworkAttribute => new NetworkAttribute(
 				$attribute->getId(),

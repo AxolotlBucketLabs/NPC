@@ -157,6 +157,10 @@ final class VanillaMobCatalog{
 		}
 		$types = array_values(array_unique($types));
 		sort($types);
+		if($includeHuman && in_array("human", $types, true)){
+			$types = array_values(array_diff($types, ["human"]));
+			array_unshift($types, "human");
+		}
 		return $types;
 	}
 
@@ -186,6 +190,117 @@ final class VanillaMobCatalog{
 		return $type !== "" && $type !== "human";
 	}
 
+	public static function canFly(string $type) : bool{
+		return in_array(self::resolve($type) ?? "", [
+			"allay",
+			"bat",
+			"bee",
+			"blaze",
+			"ender_dragon",
+			"ghast",
+			"happy_ghast",
+			"phantom",
+			"vex"
+		], true);
+	}
+
+	/** @return array{width: float, height: float} */
+	public static function size(string $type) : array{
+		$type = self::resolve($type) ?? "";
+		$sizes = [
+			"allay" => ["width" => 0.35, "height" => 0.60],
+			"armadillo" => ["width" => 0.70, "height" => 0.65],
+			"axolotl" => ["width" => 1.30, "height" => 0.60],
+			"bat" => ["width" => 0.50, "height" => 0.90],
+			"bee" => ["width" => 0.70, "height" => 0.60],
+			"blaze" => ["width" => 0.60, "height" => 1.80],
+			"bogged" => ["width" => 0.60, "height" => 1.99],
+			"breeze" => ["width" => 0.60, "height" => 1.70],
+			"camel" => ["width" => 1.70, "height" => 2.38],
+			"camel_husk" => ["width" => 1.70, "height" => 2.38],
+			"cat" => ["width" => 0.60, "height" => 0.70],
+			"cave_spider" => ["width" => 0.70, "height" => 0.50],
+			"chicken" => ["width" => 0.40, "height" => 0.70],
+			"cod" => ["width" => 0.50, "height" => 0.30],
+			"copper_golem" => ["width" => 0.70, "height" => 1.80],
+			"cow" => ["width" => 0.90, "height" => 1.40],
+			"creaking" => ["width" => 0.90, "height" => 2.50],
+			"creeper" => ["width" => 0.60, "height" => 1.70],
+			"dolphin" => ["width" => 0.90, "height" => 0.60],
+			"donkey" => ["width" => 1.40, "height" => 1.50],
+			"drowned" => ["width" => 0.60, "height" => 1.95],
+			"elder_guardian" => ["width" => 2.00, "height" => 2.00],
+			"ender_dragon" => ["width" => 16.00, "height" => 8.00],
+			"enderman" => ["width" => 0.60, "height" => 2.90],
+			"endermite" => ["width" => 0.40, "height" => 0.30],
+			"evocation_illager" => ["width" => 0.60, "height" => 1.95],
+			"fox" => ["width" => 0.70, "height" => 0.60],
+			"frog" => ["width" => 0.50, "height" => 0.50],
+			"ghast" => ["width" => 4.00, "height" => 4.00],
+			"glow_squid" => ["width" => 0.80, "height" => 0.80],
+			"goat" => ["width" => 0.90, "height" => 1.30],
+			"guardian" => ["width" => 0.85, "height" => 0.85],
+			"happy_ghast" => ["width" => 4.00, "height" => 4.00],
+			"hoglin" => ["width" => 1.40, "height" => 1.40],
+			"horse" => ["width" => 1.40, "height" => 1.60],
+			"husk" => ["width" => 0.60, "height" => 1.95],
+			"iron_golem" => ["width" => 1.40, "height" => 2.70],
+			"llama" => ["width" => 0.90, "height" => 1.87],
+			"magma_cube" => ["width" => 2.00, "height" => 2.00],
+			"mooshroom" => ["width" => 0.90, "height" => 1.40],
+			"mule" => ["width" => 1.40, "height" => 1.50],
+			"nautilus" => ["width" => 1.40, "height" => 0.90],
+			"ocelot" => ["width" => 0.60, "height" => 0.70],
+			"panda" => ["width" => 1.30, "height" => 1.25],
+			"parched" => ["width" => 0.60, "height" => 1.95],
+			"parrot" => ["width" => 0.50, "height" => 0.90],
+			"phantom" => ["width" => 0.90, "height" => 0.50],
+			"pig" => ["width" => 0.90, "height" => 0.90],
+			"piglin" => ["width" => 0.60, "height" => 1.95],
+			"piglin_brute" => ["width" => 0.60, "height" => 1.95],
+			"pillager" => ["width" => 0.60, "height" => 1.95],
+			"polar_bear" => ["width" => 1.40, "height" => 1.40],
+			"pufferfish" => ["width" => 0.70, "height" => 0.70],
+			"rabbit" => ["width" => 0.40, "height" => 0.50],
+			"ravager" => ["width" => 1.95, "height" => 2.20],
+			"salmon" => ["width" => 0.70, "height" => 0.40],
+			"sheep" => ["width" => 0.90, "height" => 1.30],
+			"shulker" => ["width" => 1.00, "height" => 1.00],
+			"silverfish" => ["width" => 0.40, "height" => 0.30],
+			"skeleton" => ["width" => 0.60, "height" => 1.99],
+			"skeleton_horse" => ["width" => 1.40, "height" => 1.60],
+			"slime" => ["width" => 2.00, "height" => 2.00],
+			"sniffer" => ["width" => 1.90, "height" => 1.90],
+			"snow_golem" => ["width" => 0.70, "height" => 1.90],
+			"spider" => ["width" => 1.40, "height" => 0.90],
+			"squid" => ["width" => 0.80, "height" => 0.80],
+			"stray" => ["width" => 0.60, "height" => 1.99],
+			"strider" => ["width" => 0.90, "height" => 1.70],
+			"tadpole" => ["width" => 0.40, "height" => 0.30],
+			"trader_llama" => ["width" => 0.90, "height" => 1.87],
+			"tropicalfish" => ["width" => 0.50, "height" => 0.40],
+			"turtle" => ["width" => 1.20, "height" => 0.40],
+			"vex" => ["width" => 0.40, "height" => 0.80],
+			"villager" => ["width" => 0.60, "height" => 1.95],
+			"villager_v2" => ["width" => 0.60, "height" => 1.95],
+			"vindicator" => ["width" => 0.60, "height" => 1.95],
+			"wandering_trader" => ["width" => 0.60, "height" => 1.95],
+			"warden" => ["width" => 0.90, "height" => 2.90],
+			"witch" => ["width" => 0.60, "height" => 1.95],
+			"wither" => ["width" => 0.90, "height" => 3.50],
+			"wither_skeleton" => ["width" => 0.70, "height" => 2.40],
+			"wolf" => ["width" => 0.60, "height" => 0.85],
+			"zoglin" => ["width" => 1.40, "height" => 1.40],
+			"zombie" => ["width" => 0.60, "height" => 1.95],
+			"zombie_horse" => ["width" => 1.40, "height" => 1.60],
+			"zombie_nautilus" => ["width" => 1.40, "height" => 0.90],
+			"zombie_pigman" => ["width" => 0.60, "height" => 1.95],
+			"zombie_villager" => ["width" => 0.60, "height" => 1.95],
+			"zombie_villager_v2" => ["width" => 0.60, "height" => 1.95]
+		];
+		return $sizes[$type] ?? ["width" => 0.60, "height" => 1.80];
+	}
+
 	public static function displayName(string $type) : string{
 		$type = self::resolve($type) ?? $type;
 		return ucwords(str_replace(["_", "-"], " ", $type));
@@ -202,7 +317,7 @@ final class VanillaMobCatalog{
 		$type = self::resolve($type) ?? "";
 		return match($type){
 			"falling_block" => "textures/blocks/stone",
-			"boat" => "textures/items/boat/boat_oak",
+			"boat" => "textures/items/boat_oak",
 			"minecart" => "textures/items/minecart",
 			"primed_tnt" => "textures/blocks/tnt_side",
 			"human" => "textures/items/egg_npc",

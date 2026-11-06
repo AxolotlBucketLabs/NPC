@@ -1,0 +1,82 @@
+<?php
+
+declare(strict_types=1);
+
+namespace NhanAZ\NPC\display;
+
+use NhanAZ\NPC\entity\ActorNpcEntity;
+use NhanAZ\NPC\entity\BlockNpcEntity;
+use NhanAZ\NPC\entity\MobNpcEntity;
+use NhanAZ\NPC\entity\NpcEntity;
+use NhanAZ\NPC\entity\NpcNametagVisibility;
+use NhanAZ\NPC\Main;
+use NhanAZ\NPC\model\NpcDefinition;
+use pocketmine\entity\Entity;
+use pocketmine\player\Player;
+use pocketmine\utils\TextFormat;
+use function array_filter;
+use function count;
+use function str_replace;
+
+/** Owns nametag rendering and network visibility metadata. */
+final class NpcDisplayService{
+	public function __construct(private Main $plugin){}
+
+	/** @param array{ok: bool, players: int, max: int, status: string}|null $query */
+	public function renderLines(NpcDefinition $definition, ?array $query = null) : string{
+		$online = (string) count($this->plugin->getServer()->getOnlinePlayers());
+		$worldOnline = (string) count(array_filter(
+			$this->plugin->getServer()->getOnlinePlayers(),
+			static fn(Player $player) : bool => $player->getWorld()->getFolderName() === $definition->getWorld()
+		));
+		$query ??= ["ok" => false, "players" => 0, "max" => 0, "status" => "offline"];
+		$selectedCount = match($definition->getPlayerCountMode()){
+			"world" => $worldOnline,
+			"query" => (string) $query["players"],
+			"none" => "",
+			default => $online
+		};
+
+		$lines = [];
+		foreach($definition->getLines() as $line){
+			$line = str_replace(
+				["{npc}", "{world}", "{online}", "{players}", "{server_players}", "{world_players}", "{player_count}", "{query_players}", "{query_max}", "{query_status}"],
+				[$definition->getId(), $definition->getWorld(), $online, $selectedCount, $online, $worldOnline, $selectedCount, (string) $query["players"], (string) $query["max"], $query["status"]],
+				$line
+			);
+			$line = str_replace(
+				["{line}", "{newLine}", "{newline}", "{newLines}", "{newlines}", "{breakLine}", "{breakline}", "\\r\\n", "\\n", "\\r", "\r\n", "\r"],
+				"\n",
+				$line
+			);
+			$lines[] = TextFormat::colorize($line);
+		}
+		return implode("\n", $lines);
+	}
+
+	public function applyNametagVisibility(Entity $entity, NpcDefinition $definition, string $renderedLines) : void{
+		$visibility = $definition->getNametagVisibility();
+		if($entity instanceof NpcNametagVisibility){
+			$entity->setNpcNametagVisibility($visibility);
+		}else{
+			$entity->setNameTagVisible($visibility !== "never");
+			$entity->setNameTagAlwaysVisible($visibility === "always");
+		}
+		if($visibility === "never"){
+			// Some Bedrock clients keep rendering a cached Human nametag even
+			// after CAN_SHOW_NAMETAG is cleared. Keep the configured lines in the
+			// definition, but clear the network text in never mode.
+			$entity->setNameTag("");
+		}else{
+			$entity->setNameTag($renderedLines);
+		}
+	}
+
+	public function syncNametagVisibility(Entity $entity, NpcDefinition $definition, string $renderedLines) : void{
+		$this->applyNametagVisibility($entity, $definition, $renderedLines);
+		// Visibility is entity metadata; updating it in place avoids re-sending
+		// AddPlayer/PlayerList packets. That is important for PersonaSkin, whose
+		// full Bedrock SkinData is not represented by a legacy Skin object.
+		$entity->sendData(null);
+	}
+}
