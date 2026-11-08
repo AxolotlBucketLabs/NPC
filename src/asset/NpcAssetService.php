@@ -35,7 +35,7 @@ use function str_replace;
 use function strlen;
 use const DIRECTORY_SEPARATOR;
 
-/** Owns NPC assets and PMMP-specific item/skin serialization. */
+/** Owns NPC assets and Axolotl-PM item and skin serialization. */
 final class NpcAssetService{
 	public function __construct(private Main $plugin){ }
 

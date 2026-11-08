@@ -53,7 +53,7 @@ use function trim;
 use function ucwords;
 
 /**
- * Particle catalog backed by the current PocketMine/Axolotl-PM particle API.
+ * Particle catalog backed by the current Axolotl-PM particle API.
  *
  * Parameterized particles use conservative vanilla defaults so they can be
  * selected from a form without asking for protocol-specific constructor data.

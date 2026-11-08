@@ -1,8 +1,8 @@
 # NPC
 
-[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![CI](https://github.com/AxolotlBucketLabs/NPC/actions/workflows/ci.yml/badge.svg)](https://github.com/AxolotlBucketLabs/NPC/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/AxolotlBucketLabs/NPC)](https://github.com/AxolotlBucketLabs/NPC/blob/main/LICENSE) [![Discord](https://img.shields.io/discord/1568295845374206052?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/Pk4FrNvHnM)
 
-NPC is an operator-focused visual NPC plugin for Axolotl-PM and PocketMine-MP API 5. It stores definitions in `plugin_data/NPC/npcs.yml` and renders stationary Human, Vanilla actor, block, boat, minecart, and TNT NPCs to Bedrock clients.
+NPC is an operator-focused visual NPC plugin for Axolotl-PM API 5. It stores definitions in `plugin_data/NPC/npcs.yml` and renders stationary Human, Vanilla actor, block, boat, minecart, and TNT NPCs to Bedrock clients.
 
 NPC actors are visual actors. They do not have mob AI, pathfinding, combat, drops, breeding, or world-entity persistence. The continuous behaviors are optional look-at rotation and the visual `fly` state for supported flying actors. The plugin keeps the Slapper-style command workflow while providing a PMForms editor for operators.
 
@@ -10,14 +10,14 @@ NPC actors are visual actors. They do not have mob AI, pathfinding, combat, drop
 
 | Requirement | Version or scope |
 | --- | --- |
-| Axolotl-PM or PocketMine-MP | API `5.0.0` or newer within the supported API 5 boundary |
+| Axolotl-PM | API `5.0.0` or newer within the supported API 5 boundary |
 | PHP | `8.4` is the repository build baseline |
 | PMForms | Bundled into the built PHAR by DevTools. A separate forms plugin is not required |
 | BedrockQuery | Optional. Needed only for remote player-count mode |
 | PureChat, PurePerms, ScoreHud | Optional runtime integrations |
 | Economy plugin | Optional. The built-in adapters check SimpleEconomy, EcoAPI, TownCoins, and TownEconomy |
 
-Development is pinned to `axolotl-pm/pocketmine-mp ~5.51.1` and PMForms `2.3.1` in `composer.lock`. CI uses AxolotlBucketLabs DevTools `v3.3.0` at commit `dcd0b04266ef954f5cc7681d94a3014e0d96023c`. The plugin manifest declares API `5.0.0`. The repository does not claim that every Axolotl-PM development revision is compatible without testing that revision.
+Development is pinned to `axolotl-pm/pocketmine-mp ~5.51.1` and PMForms `2.3.1` in `composer.lock`. CI uses AxolotlBucketLabs DevTools `v3.3.0` at commit `0fd73cc2c82d03d0d47f6c7ce119859deda042e3`. The plugin manifest declares API `5.0.0`. The repository does not claim that every Axolotl-PM development revision is compatible without testing that revision.
 
 ## Installation
 
@@ -132,7 +132,7 @@ An action without a prefix runs as the interacting player. `console:` actions ar
 | `/npc skin-url <id> <https-url or clear>` | Fetch a remote Human skin through the configured allowlist |
 | `/npc scale <id> <size>` | Set a Human or actor scale from `0.1` to `4.0` |
 
-Equipment slots are `hand`, `offhand`, `helmet`, `chestplate`, `leggings`, and `boots`. PocketMine item aliases are accepted.
+Equipment slots are `hand`, `offhand`, `helmet`, `chestplate`, `leggings`, and `boots`. Standard server item aliases are accepted.
 
 The UI provides an option to copy all or selected equipment slots from the executing player. This is available only for Human NPCs.
 
@@ -384,6 +384,10 @@ The public commands, UI flow, persistence schema, and entity packet behavior rem
 
 The plugin PHP namespace is `AxolotlBucketLabs\NPC`. Integrations that import plugin classes must use this namespace.
 
+## Attribution
+
+NPC was created by NhanAZ and is maintained by AxolotlBucketLabs.
+
 ## License
 
-NPC is released under the MIT License. Axolotl-PM, PocketMine-MP, PMForms, BedrockQuery, ScoreHud, and other optional integrations remain licensed by their respective projects.
+NPC is released under the MIT License. Axolotl-PM, PMForms, BedrockQuery, ScoreHud, and other optional integrations remain licensed by their respective projects.

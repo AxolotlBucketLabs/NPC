@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 if($argc < 2){
-	fwrite(STDERR, "Usage: php skin-data-codec-smoke.php <PocketMine-MP root>\n");
+	fwrite(STDERR, "Usage: php skin-data-codec-smoke.php <Axolotl-PM root>\n");
 	exit(2);
 }
 
 $serverRoot = realpath($argv[1]);
 if($serverRoot === false || !is_file($serverRoot . DIRECTORY_SEPARATOR . "vendor" . DIRECTORY_SEPARATOR . "autoload.php")){
-	fwrite(STDERR, "PocketMine-MP root does not contain vendor/autoload.php\n");
+	fwrite(STDERR, "Axolotl-PM root does not contain vendor/autoload.php\n");
 	exit(2);
 }
 

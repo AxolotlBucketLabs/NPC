@@ -19,7 +19,7 @@ use function trim;
  *
  * NPC deliberately uses a passive visual actor instead of instantiating the
  * server's full mob AI. This keeps definitions persistent and makes it safe
- * to display every Bedrock mob, including mobs which PocketMine does not yet
+ * to display every Bedrock mob, including mobs which Axolotl-PM does not yet
  * implement as a server-side entity.
  */
 final class VanillaMobCatalog{

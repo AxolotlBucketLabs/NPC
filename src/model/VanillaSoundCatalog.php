@@ -49,7 +49,7 @@ final class VanillaSoundCatalog{
 			}
 		}else{
 			// The standalone definition smoke test intentionally does not boot the
-			// PocketMine autoloader. Keep the model usable there while the live
+			// Axolotl-PM autoloader. Keep the model usable there while the live
 			// plugin still discovers the complete protocol table above.
 			foreach(["ambient", "ambient.in.water", "flap", "hurt", "hit", "click", "explode", "pop", "totem"] as $event){
 				$aliases[self::key($event)] = $event;

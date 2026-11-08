@@ -5,8 +5,10 @@ version: 0.8.0
 api: 5.0.0
 load: POSTWORLD
 softdepend: [BedrockQuery, PureChat, PurePerms, ScoreHud]
-author: AxolotlBucketLabs
-description: Visual NPC system for Axolotl-PM and PocketMine-MP API 5
+author: NhanAZ
+authors: [AxolotlBucketLabs]
+website: https://github.com/AxolotlBucketLabs/NPC
+description: Visual NPC system for Axolotl-PM API 5
 commands:
   npc:
     description: Manage NPCs

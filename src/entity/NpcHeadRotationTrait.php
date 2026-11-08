@@ -33,7 +33,7 @@ trait NpcHeadRotationTrait{
 		}
 	}
 
-	/** Keeps PMMP's movement packet from replacing the NPC head yaw with body yaw. */
+	/** Keeps Axolotl-PM's movement packet from replacing the NPC head yaw with body yaw. */
 	protected function broadcastMovement(bool $teleport = false) : void{
 		NetworkBroadcastUtils::broadcastPackets($this->getViewers(), [MoveActorAbsolutePacket::create(
 			$this->getId(),

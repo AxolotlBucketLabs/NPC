@@ -1,9 +1,20 @@
 {
-    "name": "axolotlbucketlabs/npc-build",
+    "name": "axolotlbucketlabs/npc",
     "type": "pocketmine-plugin",
-    "description": "Visual NPC system for Axolotl-PM and PocketMine-MP API 5",
+    "description": "Visual NPC system for Axolotl-PM API 5",
     "license": "MIT",
+    "homepage": "https://github.com/AxolotlBucketLabs/NPC",
+    "keywords": ["axolotl-pm", "bedrock", "npc", "pocketmine-plugin"],
+    "authors": [
+        {
+            "name": "NhanAZ"
+        },
+        {
+            "name": "AxolotlBucketLabs"
+        }
+    ],
     "require": {
+        "php": "^8.4",
         "axolotl-pm/pocketmine-mp": "~5.51.1",
         "dktapps/pmforms": "~2.3.1"
     },

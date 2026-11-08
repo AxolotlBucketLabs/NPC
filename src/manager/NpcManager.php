@@ -368,7 +368,7 @@ final class NpcManager{
 		// The Entity constructor only registers the actor in the world. It does
 		// not send a spawn packet to players whose chunks are already loaded.
 		// This matters for /npc create and live edits, which happen after the
-		// player has joined. Players joining later are still handled by PMMP's
+		// player has joined. Players joining later are still handled by Axolotl-PM's
 		// normal chunk-entity spawning path.
 		$entity->spawnToAll();
 		if($definition->getAnimationTrigger() === "spawn"){

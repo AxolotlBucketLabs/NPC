@@ -4,8 +4,6 @@ All notable changes to NPC are documented here.
 
 ## [Unreleased]
 
-The next release candidate is version `0.8.0`.
-
 ### Added
 
 - Add capability-aware profiles for hitboxes, eye height, rotation, variants, and editor controls.
@@ -28,6 +26,6 @@ The next release candidate is version `0.8.0`.
 
 ### Compatibility
 
-- Axolotl-PM or PocketMine-MP API `5.0.0` or newer within the API 5 boundary.
+- Axolotl-PM API `5.0.0` or newer within the API 5 boundary.
 - PHP `8.4`.
 - PMForms `2.3.1`, bundled into the built PHAR.
