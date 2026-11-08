@@ -1,7 +1,7 @@
 {
-    "name": "nhanaz/npc-build",
+    "name": "axolotlbucketlabs/npc-build",
     "type": "pocketmine-plugin",
-    "private": true,
+    "description": "Visual NPC system for Axolotl-PM and PocketMine-MP API 5",
     "license": "MIT",
     "require": {
         "axolotl-pm/pocketmine-mp": "~5.51.1",
@@ -10,7 +10,7 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/NhanAZ-Libraries/pmforms"
+            "url": "https://github.com/AxolotlBucketLabs/pmforms"
         }
     ],
     "config": {

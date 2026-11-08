@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\model;
+namespace AxolotlBucketLabs\NPC\model;
 
 use InvalidArgumentException;
 use function array_values;

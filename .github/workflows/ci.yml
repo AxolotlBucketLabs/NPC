@@ -51,7 +51,7 @@ jobs:
 
       - name: Build and analyze PHAR with DevTools
         id: build
-        uses: NhanAZ/DevTools@8b7db655845dc5d9e5e51b26a5d0815d5f7e5323 # v2.1.1
+          uses: AxolotlBucketLabs/DevTools@dcd0b04266ef954f5cc7681d94a3014e0d96023c # v3.3.0
         with:
           project: .
           prepare-dependencies: true
@@ -66,4 +66,4 @@ jobs:
           PHAR_PATH: ${{ steps.build.outputs.phar }}
         run: |
           test -f "$PHAR_PATH"
-          php -r '$p = new Phar($argv[1]); $manifest = $p["plugin.yml"]->getContent(); if (strpos($manifest, "name: NPC") === false || strpos($manifest, "main: NhanAZ\\NPC\\Main") === false) { exit(1); }' "$PHAR_PATH"
+          php -r '$p = new Phar($argv[1]); $manifest = $p["plugin.yml"]->getContent(); if (strpos($manifest, "name: NPC") === false || strpos($manifest, "main: AxolotlBucketLabs\\NPC\\Main") === false) { exit(1); }' "$PHAR_PATH"

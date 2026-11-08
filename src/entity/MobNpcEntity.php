@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\entity;
+namespace AxolotlBucketLabs\NPC\entity;
 
-use NhanAZ\NPC\model\FlightPattern;
+use AxolotlBucketLabs\NPC\model\FlightPattern;
 use pocketmine\entity\EntitySizeInfo;
 use pocketmine\entity\Living;
 use pocketmine\entity\NeverSavedWithChunkEntity;
@@ -50,7 +50,7 @@ final class MobNpcEntity extends Living implements NeverSavedWithChunkEntity, Np
 	/**
 	 * @param array{metadata?: array<int, int>, properties?: array<int, int>}|null $variantData
 	 */
-	public function __construct(Location $location, private string $npcId, private string $networkTypeId, private float $width = 0.6, private float $height = 1.8, private bool $canFly = false, private ?array $variantData = null){
+	public function __construct(Location $location, private string $npcId, private string $networkTypeId, private float $width = 0.6, private float $height = 1.8, private float $eyeHeight = 1.62, private bool $canFly = false, private ?array $variantData = null){
 		parent::__construct($location);
 		$this->setCanSaveWithChunk(false);
 		$this->setNoClientPredictions(true);
@@ -75,7 +75,7 @@ final class MobNpcEntity extends Living implements NeverSavedWithChunkEntity, Np
 	}
 
 	protected function getInitialSizeInfo() : EntitySizeInfo{
-		return new EntitySizeInfo($this->height, $this->width, min($this->height * 0.9, $this->height));
+		return new EntitySizeInfo($this->height, $this->width, min($this->eyeHeight, $this->height));
 	}
 
 	public function canBeMovedByCurrents() : bool{
@@ -175,7 +175,7 @@ final class MobNpcEntity extends Living implements NeverSavedWithChunkEntity, Np
 
 	/**
 	 * Moves the Bee through a small passive hover/orbit around its spawn point.
-	 * This is deliberately visual-only; no mob AI, pollination or persistence is added.
+	 * This is visual-only. It does not add mob AI, pollination, or persistence.
 	 */
 	public function tickFlight(int $tick) : void{
 		$position = $this->getPosition();

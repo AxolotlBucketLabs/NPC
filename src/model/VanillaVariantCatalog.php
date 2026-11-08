@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\model;
+namespace AxolotlBucketLabs\NPC\model;
 
 use function strtolower;
 
@@ -167,7 +167,11 @@ final class VanillaVariantCatalog{
 	}
 
 	public static function default(string $entityType) : string{
+		$type = VanillaMobCatalog::resolve($entityType) ?? strtolower($entityType);
 		$options = self::options($entityType);
+		if($type === "shulker" && isset($options["undyed"])){
+			return "undyed";
+		}
 		return $options === [] ? "" : (string) array_key_first($options);
 	}
 

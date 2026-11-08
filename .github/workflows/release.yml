@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    uses: NhanAZ/DevTools/.github/workflows/release-plugin.yml@8b7db655845dc5d9e5e51b26a5d0815d5f7e5323 # v2.1.1
+    uses: AxolotlBucketLabs/DevTools/.github/workflows/release-plugin.yml@dcd0b04266ef954f5cc7681d94a3014e0d96023c # v3.3.0
     with:
       mode: tag
       prepare-dependencies: true

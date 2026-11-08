@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\task;
+namespace AxolotlBucketLabs\NPC\task;
 
-use NhanAZ\NPC\Main;
+use AxolotlBucketLabs\NPC\Main;
 use pocketmine\Server;
 use pocketmine\scheduler\AsyncTask;
 use function array_map;

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\storage;
+namespace AxolotlBucketLabs\NPC\storage;
 
-use NhanAZ\NPC\Main;
-use NhanAZ\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\Main;
+use AxolotlBucketLabs\NPC\model\NpcDefinition;
 use pocketmine\utils\Config;
 use function is_array;
 use function is_int;
@@ -32,7 +32,7 @@ final class NpcRepository{
 		$version = is_int($config->get("version")) ? $config->get("version") : 1;
 		$rawNpcs = $config->get("npcs", []);
 		if(!is_array($rawNpcs)){
-			$this->plugin->getLogger()->warning("npcs.yml has an invalid 'npcs' section; ignoring it");
+			$this->plugin->getLogger()->warning("The 'npcs' section in npcs.yml is invalid. The plugin will ignore it.");
 			return [];
 		}
 

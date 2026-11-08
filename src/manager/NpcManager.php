@@ -2,29 +2,30 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\manager;
+namespace AxolotlBucketLabs\NPC\manager;
 
-use NhanAZ\NPC\entity\NpcEntity;
-use NhanAZ\NPC\entity\MobNpcEntity;
-use NhanAZ\NPC\entity\BlockNpcEntity;
-use NhanAZ\NPC\entity\ActorNpcEntity;
-use NhanAZ\NPC\asset\NpcAssetService;
-use NhanAZ\NPC\display\NpcDisplayService;
-use NhanAZ\NPC\display\NpcLookAtService;
-use NhanAZ\NPC\effect\NpcEffectsService;
-use NhanAZ\NPC\integration\NpcCommandService;
-use NhanAZ\NPC\model\NpcDefinition;
-use NhanAZ\NPC\model\VanillaMobCatalog;
-use NhanAZ\NPC\model\VanillaSoundCatalog;
-use NhanAZ\NPC\model\VanillaVariantCatalog;
-use NhanAZ\NPC\storage\NpcRepository;
-use NhanAZ\NPC\task\SkinFetchTask;
+use AxolotlBucketLabs\NPC\entity\NpcEntity;
+use AxolotlBucketLabs\NPC\entity\MobNpcEntity;
+use AxolotlBucketLabs\NPC\entity\BlockNpcEntity;
+use AxolotlBucketLabs\NPC\entity\ActorNpcEntity;
+use AxolotlBucketLabs\NPC\asset\NpcAssetService;
+use AxolotlBucketLabs\NPC\display\NpcDisplayService;
+use AxolotlBucketLabs\NPC\display\NpcLookAtService;
+use AxolotlBucketLabs\NPC\effect\NpcEffectsService;
+use AxolotlBucketLabs\NPC\integration\NpcCommandService;
+use AxolotlBucketLabs\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaParticleCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaSoundCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaVariantCatalog;
+use AxolotlBucketLabs\NPC\storage\NpcRepository;
+use AxolotlBucketLabs\NPC\task\SkinFetchTask;
 use pocketmine\entity\Skin;
 use pocketmine\event\player\PlayerEntityInteractEvent;
 use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
 use pocketmine\entity\Location;
-use NhanAZ\NPC\Main;
+use AxolotlBucketLabs\NPC\Main;
 use function array_filter;
 use function array_values;
 use function is_finite;
@@ -33,6 +34,8 @@ use function is_object;
 use function mt_rand;
 use function count;
 use function ctype_digit;
+use function floor;
+use function round;
 use function file_put_contents;
 use function is_array;
 use function is_dir;
@@ -133,6 +136,7 @@ final class NpcManager{
 	public function tick() : void{
 		$tick = $this->plugin->getServer()->getTick();
 		foreach($this->definitions as $id => $definition){
+			$profile = VanillaMobCatalog::profile($definition->getEntityType());
 			$entity = $this->entities[$id] ?? null;
 			if($entity === null || $entity->isClosed()){
 				$this->spawn($definition);
@@ -141,7 +145,7 @@ final class NpcManager{
 			if($entity === null){
 				continue;
 			}
-			if($entity instanceof MobNpcEntity && $definition->getAnimationType() === "fly"){
+			if($entity instanceof MobNpcEntity && $definition->getAnimationType() === "fly" && $profile->supports("flight")){
 				$entity->tickFlight($tick);
 			}
 			if($definition->isRandomEmoteEnabled() && $definition->getEmotePool() !== [] && $tick % 20 === 0){
@@ -154,7 +158,7 @@ final class NpcManager{
 			if($definition->getAnimationTrigger() === "timer" && $tick % $definition->getAnimationInterval() === 0){
 				$this->effects->playAnimation($entity, $definition);
 			}
-			if($definition->isAnimationSoundEnabled() && $definition->getAnimationType() === "fly" && $tick % 40 === 0){
+			if($definition->isAnimationSoundEnabled() && $definition->getAnimationType() === "fly" && $profile->supports("flight") && $tick % 40 === 0){
 				$this->effects->playAnimationSound($entity, $definition);
 			}
 
@@ -163,7 +167,7 @@ final class NpcManager{
 			}
 			$renderedLines = $this->display->renderLines($definition, $this->queryResults[$id] ?? null);
 			$this->display->applyNametagVisibility($entity, $definition, $renderedLines);
-			if($definition->isRotateEnabled()){
+			if($definition->isRotateEnabled() && $profile->supports("look_at")){
 				$this->lookAt->rotateTowardsNearestPlayer($entity, $definition);
 			}
 			if($definition->isParticleEnabled()){
@@ -215,7 +219,7 @@ final class NpcManager{
 
 	/**
 	 * Returns the first unused, human-readable ID for the create form.
-	 * The value is only a suggestion; callers may replace it with any valid ID.
+	 * This value is only a suggestion. Callers may replace it with any valid ID.
 	 */
 	public function getNextSuggestedId() : string{
 		$index = 0;
@@ -252,7 +256,7 @@ final class NpcManager{
 			$definition->setGeometry($storedSkin["geometry-name"], $storedSkin["geometry-data"]);
 			$definition->setSkinDataFile($storedSkin["skin-data"]);
 		}else{
-			$this->plugin->getLogger()->warning("Player skin for NPC '$id' could not be persisted; the live NPC will still use the current skin until the next restart");
+			$this->plugin->getLogger()->warning("Player skin for NPC '$id' could not be persisted. The live NPC will use the current skin until the next restart.");
 		}
 		$this->remove($id);
 		$this->definitions[$id] = $definition;
@@ -286,45 +290,71 @@ final class NpcManager{
 		if(isset($this->entities[$definition->getId()]) && !$this->entities[$definition->getId()]->isClosed()){
 			$this->entities[$definition->getId()]->close();
 		}
-		$location = new Location(
-			$definition->getX(),
-			$definition->getY(),
-			$definition->getZ(),
-			$world,
-			$definition->getYaw(),
-			$definition->getPitch()
-		);
 		$entityType = VanillaMobCatalog::resolve($definition->getEntityType()) ?? "human";
+		$profile = VanillaMobCatalog::profile($entityType);
+		$yaw = $definition->getYaw();
+		$pitch = $definition->getPitch();
+		$x = $definition->getX();
+		$y = $definition->getY();
+		$z = $definition->getZ();
+		if($profile->supports("block_anchor")){
+			// Falling blocks and Shulkers use a block-grid origin. Keep the
+			// server-side hitbox, nametag and attachment metadata aligned with the
+			// model instead of spawning at the player's fractional coordinates.
+			$x = floor($x) + 0.5;
+			$y = floor($y);
+			$z = floor($z) + 0.5;
+		}
+		if($profile->getRotationMode() === "cardinal"){
+			$yaw = round($yaw / 90.0) * 90.0;
+			$pitch = 0.0;
+		}
+		$location = new Location(
+			$x,
+			$y,
+			$z,
+			$world,
+			$yaw,
+			$pitch
+		);
 		if($entityType === "falling_block"){
-			$block = $this->assets->parseBlock($definition->getBlockId());
-			if($block === null){
-				$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' needs a valid block-id for falling_block; using Human fallback");
-				$entity = new NpcEntity($location, $definition->getId(), $skinOverride ?? $this->loadSkin($definition), $this->assets->readNetworkSkinData($definition->getSkinDataFile()));
-			}else{
-				$entity = new BlockNpcEntity($location, $definition->getId(), $block);
+			$blockId = $definition->getBlockId();
+			if($blockId === ""){
+				$definition->setBlockId("stone");
+				$blockId = "stone";
+				$this->save();
 			}
+			$block = $this->assets->parseBlock($blockId);
+			if($block === null){
+				$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' has invalid block-id '" . $blockId . "'. Falling block NPCs use stone instead.");
+				$definition->setBlockId("stone");
+				$block = $this->assets->parseBlock("stone");
+				$this->save();
+			}
+			if($block === null){
+				$this->plugin->getLogger()->error("Unable to create falling_block NPC '" . $definition->getId() . "': the stone block could not be resolved");
+				return null;
+			}
+			$entity = new BlockNpcEntity($location, $definition->getId(), $block, $profile->getSpawnOffsetY());
 		}elseif(in_array($entityType, ["boat", "minecart", "primed_tnt"], true)){
 			$networkId = VanillaMobCatalog::networkId($entityType);
 			if($networkId === null){
 				return null;
 			}
-			[$width, $height] = match($entityType){
-				"boat" => [1.4, 0.6],
-				"minecart" => [0.98, 0.7],
-				default => [0.98, 0.98]
-			};
-			$entity = new ActorNpcEntity($location, $definition->getId(), $networkId, $width, $height);
+			$entity = new ActorNpcEntity($location, $definition->getId(), $networkId, $profile->getWidth(), $profile->getHeight(), $profile->getEyeHeight(), $profile->getSpawnOffsetY());
 		}elseif($entityType !== "human"){
 			$networkId = VanillaMobCatalog::networkId($entityType);
 			if($networkId === null){
 				return null;
 			}
-			$size = VanillaMobCatalog::size($entityType);
 			$variant = VanillaVariantCatalog::resolve($entityType, $definition->getVariant());
 			if($variant === null && VanillaVariantCatalog::hasVariants($entityType)){
-				$variant = VanillaVariantCatalog::resolve($entityType, VanillaVariantCatalog::default($entityType));
+				$defaultVariant = VanillaVariantCatalog::default($entityType);
+				$definition->setVariant($defaultVariant);
+				$this->save();
+				$variant = VanillaVariantCatalog::resolve($entityType, $defaultVariant);
 			}
-			$entity = new MobNpcEntity($location, $definition->getId(), $networkId, $size["width"], $size["height"], $this->canFly($entityType), $variant);
+			$entity = new MobNpcEntity($location, $definition->getId(), $networkId, $profile->getWidth(), $profile->getHeight(), $profile->getEyeHeight(), $profile->supports("flight"), $variant);
 		}else{
 		$entity = new NpcEntity($location, $definition->getId(), $skinOverride ?? $this->loadSkin($definition), $this->assets->readNetworkSkinData($definition->getSkinDataFile()));
 		}
@@ -383,7 +413,8 @@ final class NpcManager{
 		}
 		switch($field){
 			case "particle":
-				if(!in_array($type, ["bubble", "critical", "entity_flame", "explode", "flame", "happy_villager", "heart", "lava", "portal", "smoke", "splash", "water"], true)){
+				$type = VanillaParticleCatalog::resolve($type);
+				if($type === null){
 					return false;
 				}
 				$definition->setParticleType($type);
@@ -420,6 +451,9 @@ final class NpcManager{
 		}
 		$definition->setEntityType($resolved);
 		$definition->setVariant(VanillaVariantCatalog::default($resolved));
+		if($resolved === "falling_block" && $definition->getBlockId() === ""){
+			$definition->setBlockId("stone");
+		}
 		$this->save();
 		$this->respawn($id);
 		return true;
@@ -444,7 +478,12 @@ final class NpcManager{
 
 	public function setAnimation(string $id, string $type, string $animationId = "", int $interval = 100, string $trigger = "timer") : bool{
 		$definition = $this->definitions[$id] ?? null;
-		if($definition === null || !in_array(strtolower(str_replace("-", "_", $type)), ["none", "emote", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
+		$type = strtolower(str_replace("-", "_", $type));
+		if($definition === null || !in_array($type, ["none", "emote", "fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true)){
+			return false;
+		}
+		$profile = VanillaMobCatalog::profile($definition->getEntityType());
+		if(($type === "emote" && !$profile->supports("emote")) || ($type === "fly" && !$profile->supports("flight")) || (in_array($type, ["arm_swing", "hurt", "critical_hit", "magic_critical"], true) && !$profile->supports("actor_animation"))){
 			return false;
 		}
 		$definition->setAnimation($type, $animationId, $interval, $trigger);
@@ -839,7 +878,7 @@ final class NpcManager{
 			}
 		}
 		if($nearestId === null || $nearestEntity === null){
-			return in_array($tag, ["npc.nearest_id", "npc.nearest_name", "npc.nearest_distance", "npc.nearest_entity_id", "npc.nearest_type", "npc.nearest_animation", "npc.nearest_emote", "npc.nearest_motion"], true) ? "" : null;
+			return in_array($tag, ["npc.nearest_id", "npc.nearest_name", "npc.nearest_distance", "npc.nearest_entity_id", "npc.nearest_type", "npc.nearest_variant", "npc.nearest_world", "npc.nearest_nametag_visibility", "npc.nearest_animation", "npc.nearest_emote", "npc.nearest_motion"], true) ? "" : null;
 		}
 		$definition = $this->definitions[$nearestId] ?? null;
 		$value = match($tag){
@@ -848,6 +887,9 @@ final class NpcManager{
 			"npc.nearest_distance" => sprintf("%.1f", sqrt($nearestDistance)),
 			"npc.nearest_entity_id" => (string) $nearestEntity->getId(),
 			"npc.nearest_type" => $definition?->getEntityType() ?? "",
+			"npc.nearest_variant" => $definition?->getVariant() ?? "",
+			"npc.nearest_world" => $definition?->getWorld() ?? $world->getFolderName(),
+			"npc.nearest_nametag_visibility" => $definition?->getNametagVisibility() ?? "",
 			"npc.nearest_animation" => $definition !== null && in_array($definition->getAnimationType(), ["fly", "arm_swing", "hurt", "critical_hit", "magic_critical"], true) ? $definition->getAnimationType() : "none",
 			"npc.nearest_emote" => $definition?->getAnimationType() === "emote" ? $definition->getAnimationId() : "",
 			"npc.nearest_motion" => $definition?->getAnimationType() === "fly" ? "fly" : "none",
@@ -980,10 +1022,6 @@ final class NpcManager{
 		$definition->setSkinDataFile("");
 		$this->save();
 		$this->respawn($id);
-	}
-
-	private function canFly(string $entityType) : bool{
-		return VanillaMobCatalog::canFly($entityType);
 	}
 
 	private function queryPlayerCount(NpcDefinition $definition) : void{

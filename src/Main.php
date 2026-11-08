@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC;
+namespace AxolotlBucketLabs\NPC;
 
-use NhanAZ\NPC\command\NpcCommandHandler;
-use NhanAZ\NPC\entity\NpcEntity;
-use NhanAZ\NPC\entity\MobNpcEntity;
-use NhanAZ\NPC\entity\BlockNpcEntity;
-use NhanAZ\NPC\entity\ActorNpcEntity;
-use NhanAZ\NPC\integration\ScoreHudIntegration;
-use NhanAZ\NPC\manager\NpcManager;
-use NhanAZ\NPC\model\EmoteCatalog;
-use NhanAZ\NPC\model\VanillaMobCatalog;
+use AxolotlBucketLabs\NPC\command\NpcCommandHandler;
+use AxolotlBucketLabs\NPC\entity\NpcEntity;
+use AxolotlBucketLabs\NPC\entity\MobNpcEntity;
+use AxolotlBucketLabs\NPC\entity\BlockNpcEntity;
+use AxolotlBucketLabs\NPC\entity\ActorNpcEntity;
+use AxolotlBucketLabs\NPC\integration\ScoreHudIntegration;
+use AxolotlBucketLabs\NPC\manager\NpcManager;
+use AxolotlBucketLabs\NPC\model\EmoteCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
 use pocketmine\event\Listener;

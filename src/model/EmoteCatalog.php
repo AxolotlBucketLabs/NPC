@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\model;
+namespace AxolotlBucketLabs\NPC\model;
 
 use JsonException;
 use function count;
@@ -42,8 +42,8 @@ final class EmoteCatalog{
 
 	/**
 	 * Loads the generated title-to-UUID catalog bundled in resources/emotes.jsonl.
-	 * Duplicate Marketplace titles are kept addressable through their UUIDs; the
-	 * first title wins for the convenient name lookup.
+	 * The catalog keeps duplicate Marketplace titles addressable by UUID. Name
+	 * lookup uses the first matching title.
 	 */
 	public static function load(string $contents) : int{
 		$loaded = 0;

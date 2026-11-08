@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\sound;
+namespace AxolotlBucketLabs\NPC\sound;
 
 use pocketmine\math\Vector3;
 use pocketmine\network\mcpe\protocol\LevelSoundEventPacket;

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\asset;
+namespace AxolotlBucketLabs\NPC\asset;
 
-use NhanAZ\NPC\Main;
-use NhanAZ\NPC\entity\NpcEntity;
-use NhanAZ\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\Main;
+use AxolotlBucketLabs\NPC\entity\NpcEntity;
+use AxolotlBucketLabs\NPC\model\NpcDefinition;
 use pocketmine\block\Block;
 use pocketmine\entity\Skin;
 use pocketmine\item\Item;
@@ -97,7 +97,7 @@ final class NpcAssetService{
 		$skinData = $this->readSkinAsset($definition->getSkinFile(), max(Skin::ACCEPTED_SKIN_SIZES));
 		if($skinData === "" || !in_array(strlen($skinData), Skin::ACCEPTED_SKIN_SIZES, true)){
 			if($definition->getSkinFile() !== ""){
-				$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' has an invalid or missing raw skin file; using fallback skin");
+			$this->plugin->getLogger()->warning("NPC '" . $definition->getId() . "' has an invalid or missing raw skin file. Using the fallback skin.");
 			}
 			return NpcEntity::defaultSkin();
 		}
@@ -169,7 +169,7 @@ final class NpcAssetService{
 			try{
 				return LegacyStringToItemParser::getInstance()->parse($blockId)->getBlock();
 			}catch(\Throwable $error){
-				$this->plugin->getLogger()->warning("NPC block '$blockId' uses an unsupported legacy block ID: " . $error->getMessage() . "; use a modern block name such as stone");
+				$this->plugin->getLogger()->warning("NPC block '$blockId' uses an unsupported legacy block ID. Use a modern block name such as stone. Parser message: " . $error->getMessage());
 			}
 		}
 		return null;

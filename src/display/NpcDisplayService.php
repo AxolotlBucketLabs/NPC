@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\display;
+namespace AxolotlBucketLabs\NPC\display;
 
-use NhanAZ\NPC\entity\ActorNpcEntity;
-use NhanAZ\NPC\entity\BlockNpcEntity;
-use NhanAZ\NPC\entity\MobNpcEntity;
-use NhanAZ\NPC\entity\NpcEntity;
-use NhanAZ\NPC\entity\NpcNametagVisibility;
-use NhanAZ\NPC\Main;
-use NhanAZ\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\entity\ActorNpcEntity;
+use AxolotlBucketLabs\NPC\entity\BlockNpcEntity;
+use AxolotlBucketLabs\NPC\entity\MobNpcEntity;
+use AxolotlBucketLabs\NPC\entity\NpcEntity;
+use AxolotlBucketLabs\NPC\entity\NpcNametagVisibility;
+use AxolotlBucketLabs\NPC\Main;
+use AxolotlBucketLabs\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
 use pocketmine\entity\Entity;
 use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
@@ -36,12 +37,13 @@ final class NpcDisplayService{
 			"none" => "",
 			default => $online
 		};
+		$entityType = VanillaMobCatalog::resolve($definition->getEntityType()) ?? $definition->getEntityType();
 
 		$lines = [];
 		foreach($definition->getLines() as $line){
 			$line = str_replace(
-				["{npc}", "{world}", "{online}", "{players}", "{server_players}", "{world_players}", "{player_count}", "{query_players}", "{query_max}", "{query_status}"],
-				[$definition->getId(), $definition->getWorld(), $online, $selectedCount, $online, $worldOnline, $selectedCount, (string) $query["players"], (string) $query["max"], $query["status"]],
+				["{npc}", "{npc_id}", "{world}", "{online}", "{players}", "{server_players}", "{world_players}", "{player_count}", "{query_players}", "{query_max}", "{query_status}", "{entity_type}", "{variant}", "{color}"],
+				[$definition->getId(), $definition->getId(), $definition->getWorld(), $online, $selectedCount, $online, $worldOnline, $selectedCount, (string) $query["players"], (string) $query["max"], $query["status"], $entityType, $definition->getVariant(), "§"],
 				$line
 			);
 			$line = str_replace(
@@ -74,7 +76,7 @@ final class NpcDisplayService{
 
 	public function syncNametagVisibility(Entity $entity, NpcDefinition $definition, string $renderedLines) : void{
 		$this->applyNametagVisibility($entity, $definition, $renderedLines);
-		// Visibility is entity metadata; updating it in place avoids re-sending
+		// Visibility is entity metadata. Updating it in place avoids re-sending
 		// AddPlayer/PlayerList packets. That is important for PersonaSkin, whose
 		// full Bedrock SkinData is not represented by a legacy Skin object.
 		$entity->sendData(null);

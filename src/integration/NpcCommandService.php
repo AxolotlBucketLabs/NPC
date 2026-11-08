@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\integration;
+namespace AxolotlBucketLabs\NPC\integration;
 
-use NhanAZ\NPC\Main;
-use NhanAZ\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\Main;
+use AxolotlBucketLabs\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
 use pocketmine\console\ConsoleCommandSender;
 use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
@@ -17,6 +18,7 @@ use function is_object;
 use function is_string;
 use function str_replace;
 use function str_starts_with;
+use function sprintf;
 use function strtolower;
 use function substr;
 use function trim;
@@ -100,13 +102,24 @@ final class NpcCommandService{
 		}catch(\Throwable $error){
 			$this->plugin->getLogger()->debug("Optional NPC integration failed: " . $error->getMessage());
 		}
+		$entityType = VanillaMobCatalog::resolve($definition->getEntityType()) ?? $definition->getEntityType();
+		$playerUuid = $player->getUniqueId()->toString();
 
 		return [
 			"{player}" => $player->getName(),
+			"{player_uuid}" => $playerUuid,
 			"{name}" => $player->getName(),
 			"{display_name}" => $player->getDisplayName(),
 			"{npc}" => $definition->getId(),
+			"{npc_id}" => $definition->getId(),
 			"{world}" => $definition->getWorld(),
+			"{entity_type}" => $entityType,
+			"{variant}" => $definition->getVariant(),
+			"{npc_x}" => sprintf("%.3f", $definition->getX()),
+			"{npc_y}" => sprintf("%.3f", $definition->getY()),
+			"{npc_z}" => sprintf("%.3f", $definition->getZ()),
+			"{npc_yaw}" => sprintf("%.2f", $definition->getYaw()),
+			"{npc_pitch}" => sprintf("%.2f", $definition->getPitch()),
 			"{online}" => (string) count($this->plugin->getServer()->getOnlinePlayers()),
 			"{players}" => (string) count($this->plugin->getServer()->getOnlinePlayers()),
 			"{prefix}" => $prefix,

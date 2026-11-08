@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\entity;
+namespace AxolotlBucketLabs\NPC\entity;
 
 use pocketmine\entity\Entity;
 use pocketmine\entity\EntitySizeInfo;
 use pocketmine\entity\Location;
 use pocketmine\entity\NeverSavedWithChunkEntity;
+use pocketmine\math\Vector3;
 use pocketmine\network\mcpe\protocol\AddActorPacket;
 use pocketmine\network\mcpe\protocol\types\entity\Attribute as NetworkAttribute;
 use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataCollection;
@@ -29,7 +30,9 @@ final class ActorNpcEntity extends Entity implements NeverSavedWithChunkEntity, 
 		private string $npcId,
 		private string $networkTypeId,
 		private float $width,
-		private float $height
+		private float $height,
+		private float $eyeHeight,
+		private float $spawnOffsetY = 0.0
 	){
 		parent::__construct($location);
 		$this->setCanSaveWithChunk(false);
@@ -37,7 +40,7 @@ final class ActorNpcEntity extends Entity implements NeverSavedWithChunkEntity, 
 		$this->setGravity(0.0);
 	}
 
-	/** Static fallback required by Entity; the actual ID is sent per actor. */
+	/** Entity requires a static fallback. Each actor receives its actual network ID. */
 	public static function getNetworkTypeId() : string{
 		return "minecraft:boat";
 	}
@@ -51,11 +54,15 @@ final class ActorNpcEntity extends Entity implements NeverSavedWithChunkEntity, 
 	}
 
 	protected function getInitialSizeInfo() : EntitySizeInfo{
-		return new EntitySizeInfo($this->width, $this->height);
+		return new EntitySizeInfo($this->height, $this->width, min($this->eyeHeight, $this->height));
 	}
 
 	public function canBeMovedByCurrents() : bool{
 		return false;
+	}
+
+	public function getOffsetPosition(Vector3 $vector3) : Vector3{
+		return $vector3->add(0, $this->spawnOffsetY, 0);
 	}
 
 	protected function syncNetworkData(EntityMetadataCollection $properties) : void{

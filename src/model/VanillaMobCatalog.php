@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\model;
+namespace AxolotlBucketLabs\NPC\model;
 
 use InvalidArgumentException;
 use function array_keys;
 use function array_merge;
 use function asort;
 use function ctype_lower;
+use function min;
 use function preg_match;
 use function strtolower;
 use function trim;
@@ -22,6 +23,9 @@ use function trim;
  * implement as a server-side entity.
  */
 final class VanillaMobCatalog{
+	/** @var array<string, VanillaEntityProfile> */
+	private static array $profiles = [];
+
 	/** @var array<string, string> canonical type => Bedrock network identifier */
 	private static array $types = [
 		"falling_block" => "minecraft:falling_block",
@@ -164,6 +168,11 @@ final class VanillaMobCatalog{
 		return $types;
 	}
 
+	/** @return list<string> */
+	public static function specialActorTypes() : array{
+		return ["boat", "falling_block", "minecart", "primed_tnt"];
+	}
+
 	public static function resolve(string $type) : ?string{
 		$type = strtolower(trim($type));
 		if(str_starts_with($type, "minecraft:")){
@@ -202,6 +211,92 @@ final class VanillaMobCatalog{
 			"phantom",
 			"vex"
 		], true);
+	}
+
+	public static function profile(string $type) : VanillaEntityProfile{
+		$type = self::resolve($type) ?? "";
+		return self::$profiles[$type] ??= self::createProfile($type);
+	}
+
+	private static function createProfile(string $type) : VanillaEntityProfile{
+		if($type === "human"){
+			return new VanillaEntityProfile(0.6, 1.8, 1.62, "body_head", [
+				"look_at" => true,
+				"appearance" => true,
+				"equipment" => true,
+				"emote" => true,
+				"actor_animation" => true,
+				"particle" => true,
+				"sound" => true
+			]);
+		}
+		if($type === "falling_block"){
+			return new VanillaEntityProfile(0.98, 0.98, 0.98, "none", [
+				"appearance" => true,
+				"block_visual" => true,
+				"block_anchor" => true,
+				"particle" => true,
+				"sound" => true
+			], 0.49);
+		}
+		if(in_array($type, ["boat", "minecart", "primed_tnt"], true)){
+			[$width, $height] = match($type){
+				"boat" => [1.4, 0.6],
+				"minecart" => [0.98, 0.7],
+				default => [0.98, 0.98]
+			};
+			return new VanillaEntityProfile($width, $height, $height, "body_head", [
+				"look_at" => true,
+				"particle" => true,
+				"sound" => true
+			], 0.49);
+		}
+
+		$size = self::size($type);
+		return new VanillaEntityProfile(
+			$size["width"],
+			$size["height"],
+			self::eyeHeight($type, $size["height"]),
+			$type === "shulker" ? "cardinal" : "body_head",
+			[
+				"look_at" => true,
+				"variant" => VanillaVariantCatalog::hasVariants($type),
+				"block_anchor" => $type === "shulker",
+				"actor_animation" => true,
+				"flight" => self::canFly($type),
+				"particle" => true,
+				"sound" => true
+			]
+		);
+	}
+
+	private static function eyeHeight(string $type, float $height) : float{
+		$eyeHeights = [
+			"allay" => 0.30,
+			"armadillo" => 0.33,
+			"axolotl" => 0.30,
+			"bat" => 0.45,
+			"bee" => 0.30,
+			"chicken" => 0.52,
+			"cod" => 0.18,
+			"dolphin" => 0.30,
+			"enderman" => 2.60,
+			"ender_dragon" => 4.00,
+			"frog" => 0.25,
+			"ghast" => 2.00,
+			"phantom" => 0.25,
+			"pufferfish" => 0.35,
+			"rabbit" => 0.35,
+			"shulker" => 0.50,
+			"spider" => 0.45,
+			"squid" => 0.40,
+			"tadpole" => 0.15,
+			"tropicalfish" => 0.20,
+			"turtle" => 0.20,
+			"vex" => 0.40,
+			"warden" => 2.60
+		];
+		return min($eyeHeights[$type] ?? $height * 0.9, $height);
 	}
 
 	/** @return array{width: float, height: float} */
@@ -318,7 +413,7 @@ final class VanillaMobCatalog{
 		return match($type){
 			"falling_block" => "textures/blocks/stone",
 			"boat" => "textures/items/boat_oak",
-			"minecart" => "textures/items/minecart",
+			"minecart" => "textures/items/minecart_normal",
 			"primed_tnt" => "textures/blocks/tnt_side",
 			"human" => "textures/items/egg_npc",
 			"evocation_illager" => "textures/items/spawn_eggs/spawn_egg_evoker",
@@ -334,7 +429,7 @@ final class VanillaMobCatalog{
 
 	/**
 	 * Registers a passive custom visual actor. This does not load PHP classes or
-	 * execute external code; the caller only supplies a Bedrock network ID.
+	 * execute external code. The caller supplies only a Bedrock network ID.
 	 */
 	public static function registerCustom(string $name, string $networkId) : void{
 		$name = strtolower(trim($name));

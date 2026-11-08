@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\command;
+namespace AxolotlBucketLabs\NPC\command;
 
-use NhanAZ\NPC\manager\NpcManager;
-use NhanAZ\NPC\model\EmoteCatalog;
-use NhanAZ\NPC\model\VanillaMobCatalog;
-use NhanAZ\NPC\ui\NpcUiManager;
+use AxolotlBucketLabs\NPC\manager\NpcManager;
+use AxolotlBucketLabs\NPC\model\EmoteCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
+use AxolotlBucketLabs\NPC\ui\NpcUiManager;
 use pocketmine\command\CommandSender;
 use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
@@ -221,11 +221,7 @@ final class NpcCommandHandler{
 	}
 
 	private function nextId() : string{
-		$number = 1;
-		while($this->manager->getDefinition("npc_" . $number) !== null){
-			++$number;
-		}
-		return "npc_" . $number;
+		return $this->manager->getNextSuggestedId();
 	}
 
 	/** @param list<string> $args */
@@ -457,7 +453,7 @@ final class NpcCommandHandler{
 			$url = "";
 		}
 		$ok = $this->manager->setSkinUrl($id, $url);
-		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC skin URL saved; download is running asynchronously." : TextFormat::RED . "NPC not found, not Human, or URL is invalid/disabled by the allowlist.");
+		$sender->sendMessage($ok ? TextFormat::GREEN . "NPC skin URL saved. Download is running asynchronously." : TextFormat::RED . "NPC not found, not Human, or URL is invalid or disabled by the allowlist.");
 		return true;
 	}
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\entity;
+namespace AxolotlBucketLabs\NPC\entity;
 
 use pocketmine\network\mcpe\NetworkBroadcastUtils;
 use pocketmine\network\mcpe\protocol\MoveActorAbsolutePacket;

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "076dbce0875661a6b5b29f7b9ff0a3e5",
+    "content-hash": "c58e4e944e15f2da41d44079b9f00bb0",
     "packages": [
         {
             "name": "adhocore/json-comment",
@@ -444,12 +444,12 @@
             "version": "2.3.1",
             "source": {
                 "type": "git",
-                "url": "https://github.com/NhanAZ-Libraries/pmforms.git",
+                "url": "https://github.com/AxolotlBucketLabs/pmforms.git",
                 "reference": "d1216886a00a5fa24ea4eaae4605750fd8d125a9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/NhanAZ-Libraries/pmforms/zipball/d1216886a00a5fa24ea4eaae4605750fd8d125a9",
+                "url": "https://api.github.com/repos/AxolotlBucketLabs/pmforms/zipball/d1216886a00a5fa24ea4eaae4605750fd8d125a9",
                 "reference": "d1216886a00a5fa24ea4eaae4605750fd8d125a9",
                 "shasum": ""
             },
@@ -485,7 +485,7 @@
             ],
             "description": "Form API library for PocketMine-MP plugins",
             "support": {
-                "source": "https://github.com/NhanAZ-Libraries/pmforms/tree/2.3.1"
+                "source": "https://github.com/AxolotlBucketLabs/pmforms/tree/2.3.1"
             },
             "time": "2026-11-05T13:20:25+00:00"
         },

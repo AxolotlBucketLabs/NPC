@@ -1,13 +1,12 @@
 name: NPC
-main: NhanAZ\NPC\Main
-src-namespace-prefix: NhanAZ\NPC
-version: 0.7.0
+main: AxolotlBucketLabs\NPC\Main
+src-namespace-prefix: AxolotlBucketLabs\NPC
+version: 0.8.0
 api: 5.0.0
 load: POSTWORLD
 softdepend: [BedrockQuery, PureChat, PurePerms, ScoreHud]
-author: NhanAZ
-description: All-in-one NPC system for Axolotl-PM and PocketMine-MP API 5
-website: https://github.com/NhanAZ-Plugins/NPC
+author: AxolotlBucketLabs
+description: Visual NPC system for Axolotl-PM and PocketMine-MP API 5
 commands:
   npc:
     description: Manage NPCs

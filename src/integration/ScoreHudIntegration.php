@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\integration;
+namespace AxolotlBucketLabs\NPC\integration;
 
 use Ifera\ScoreHud\event\PlayerTagUpdateEvent;
 use Ifera\ScoreHud\event\TagsResolveEvent;
 use Ifera\ScoreHud\scoreboard\ScoreTag;
-use NhanAZ\NPC\Main;
-use NhanAZ\NPC\manager\NpcManager;
+use AxolotlBucketLabs\NPC\Main;
+use AxolotlBucketLabs\NPC\manager\NpcManager;
 use pocketmine\event\Event;
 use pocketmine\event\EventPriority;
 use pocketmine\player\Player;
@@ -29,6 +29,9 @@ final class ScoreHudIntegration{
 		"npc.nearest_distance",
 		"npc.nearest_entity_id",
 		"npc.nearest_type",
+		"npc.nearest_variant",
+		"npc.nearest_world",
+		"npc.nearest_nametag_visibility",
 		"npc.nearest_animation",
 		"npc.nearest_emote",
 		"npc.nearest_motion"

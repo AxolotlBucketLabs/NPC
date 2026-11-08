@@ -2,35 +2,24 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\effect;
+namespace AxolotlBucketLabs\NPC\effect;
 
-use NhanAZ\NPC\entity\ActorNpcEntity;
-use NhanAZ\NPC\entity\BlockNpcEntity;
-use NhanAZ\NPC\entity\MobNpcEntity;
-use NhanAZ\NPC\entity\NpcEntity;
-use NhanAZ\NPC\model\EmoteCatalog;
-use NhanAZ\NPC\model\NpcDefinition;
-use NhanAZ\NPC\model\VanillaMobCatalog;
-use NhanAZ\NPC\model\VanillaSoundCatalog;
-use NhanAZ\NPC\sound\BedrockSound;
+use AxolotlBucketLabs\NPC\entity\ActorNpcEntity;
+use AxolotlBucketLabs\NPC\entity\BlockNpcEntity;
+use AxolotlBucketLabs\NPC\entity\MobNpcEntity;
+use AxolotlBucketLabs\NPC\entity\NpcEntity;
+use AxolotlBucketLabs\NPC\model\EmoteCatalog;
+use AxolotlBucketLabs\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaParticleCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaSoundCatalog;
+use AxolotlBucketLabs\NPC\sound\BedrockSound;
 use pocketmine\entity\animation\ArmSwingAnimation;
 use pocketmine\entity\animation\CriticalHitAnimation;
 use pocketmine\entity\animation\HurtAnimation;
 use pocketmine\entity\animation\MagicHitAnimation;
 use pocketmine\player\Player;
-use pocketmine\world\particle\BubbleParticle;
-use pocketmine\world\particle\CriticalParticle;
-use pocketmine\world\particle\EntityFlameParticle;
-use pocketmine\world\particle\ExplodeParticle;
-use pocketmine\world\particle\FlameParticle;
-use pocketmine\world\particle\HappyVillagerParticle;
-use pocketmine\world\particle\HeartParticle;
-use pocketmine\world\particle\LavaParticle;
 use pocketmine\world\particle\Particle;
-use pocketmine\world\particle\PortalParticle;
-use pocketmine\world\particle\SmokeParticle;
-use pocketmine\world\particle\SplashParticle;
-use pocketmine\world\particle\WaterParticle;
 use pocketmine\world\sound\ClickSound;
 use pocketmine\world\sound\DoorBumpSound;
 use pocketmine\world\sound\ExplodeSound;
@@ -52,20 +41,7 @@ final class NpcEffectsService{
 	}
 
 	public function createParticle(string $type) : Particle{
-		return match($type){
-			"bubble" => new BubbleParticle(),
-			"critical" => new CriticalParticle(),
-			"entity_flame" => new EntityFlameParticle(),
-			"explode" => new ExplodeParticle(),
-			"happy_villager" => new HappyVillagerParticle(),
-			"heart" => new HeartParticle(),
-			"lava" => new LavaParticle(),
-			"portal" => new PortalParticle(),
-			"smoke" => new SmokeParticle(),
-			"splash" => new SplashParticle(),
-			"water" => new WaterParticle(),
-			default => new FlameParticle()
-		};
+		return VanillaParticleCatalog::create($type);
 	}
 
 	public function playInteractionSound(NpcEntity|MobNpcEntity|BlockNpcEntity|ActorNpcEntity $entity, NpcDefinition $definition, Player $player) : void{

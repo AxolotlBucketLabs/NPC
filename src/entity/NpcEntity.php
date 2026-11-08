@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NhanAZ\NPC\entity;
+namespace AxolotlBucketLabs\NPC\entity;
 
 use pocketmine\entity\Human;
 use pocketmine\entity\NeverSavedWithChunkEntity;

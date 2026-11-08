@@ -1,6 +1,6 @@
 # NPC
 
-[![CI](https://github.com/NhanAZ-Plugins/NPC/actions/workflows/ci.yml/badge.svg)](https://github.com/NhanAZ-Plugins/NPC/actions/workflows/ci.yml)
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 
 NPC is an operator-focused visual NPC plugin for Axolotl-PM and PocketMine-MP API 5. It stores definitions in `plugin_data/NPC/npcs.yml` and renders stationary Human, Vanilla actor, block, boat, minecart, and TNT NPCs to Bedrock clients.
 
@@ -17,7 +17,7 @@ NPC actors are visual actors. They do not have mob AI, pathfinding, combat, drop
 | PureChat, PurePerms, ScoreHud | Optional runtime integrations |
 | Economy plugin | Optional. The built-in adapters check SimpleEconomy, EcoAPI, TownCoins, and TownEconomy |
 
-Development is pinned to `axolotl-pm/pocketmine-mp ~5.51.1` in `composer.json`. The plugin manifest declares API `5.0.0`. The repository does not claim that every Axolotl-PM development revision is compatible without testing that revision.
+Development is pinned to `axolotl-pm/pocketmine-mp ~5.51.1` and PMForms `2.3.1` in `composer.lock`. CI uses AxolotlBucketLabs DevTools `v3.3.0` at commit `dcd0b04266ef954f5cc7681d94a3014e0d96023c`. The plugin manifest declares API `5.0.0`. The repository does not claim that every Axolotl-PM development revision is compatible without testing that revision.
 
 ## Installation
 
@@ -169,7 +169,7 @@ Nametag visibility uses the native Slapper-style metadata path:
 
 `hover` is client-defined. It is not a server-side raycast against the NPC's body or text. The legacy `nametag-visible: true|false` field and `/npc namevisible <id> <on|off>` command remain supported and map to `always` or `never`.
 
-Look-at rotation is independent of nametag visibility. When enabled, the NPC updates its body and head orientation toward the nearest player within `rotation-distance`. The calculation uses the player's eye height. Shulkers use a cardinal body direction because their Bedrock actor is block-attached.
+Look-at rotation is independent of nametag visibility. When enabled, the NPC updates its body and head orientation toward the nearest connected, living, non-spectator player within `rotation-distance`. The calculation uses the player's eye height. When no valid player is in range, it restores the saved creation orientation. Shulkers use a cardinal body direction because their Bedrock actor is block-attached.
 
 ## Player-count displays
 
@@ -197,7 +197,11 @@ The following placeholders are available in `lines` and are evaluated for the NP
 
 ```text
 {npc}              Stable NPC ID
+{npc_id}           Explicit alias for the stable NPC ID
 {world}            NPC world name
+{entity_type}      Canonical NPC entity type, for example bee
+{variant}          Persisted entity variant/color value, when supported
+{color}            Slapper-compatible section-sign color prefix (§)
 {online}           Server player count
 {players}          Selected player-count value
 {server_players}   Server player count
@@ -211,13 +215,17 @@ The following placeholders are available in `lines` and are evaluated for the NP
 The following placeholders are available in click actions and are resolved for the interacting player:
 
 ```text
-{player} {name} {display_name}
-{npc} {world} {online} {players}
+{player} {player_uuid} {name} {display_name}
+{npc} {npc_id} {world} {entity_type} {variant}
+{npc_x} {npc_y} {npc_z} {npc_yaw} {npc_pitch}
+{online} {players}
 {prefix} {suffix} {rank}
 {balance} {money} {coins}
 ```
 
 `{prefix}` and `{suffix}` use PureChat when available. `{rank}` uses PurePerms when available. Economy placeholders try SimpleEconomy, EcoAPI, TownCoins, and TownEconomy in that order.
+
+`{player}` and `{player_uuid}` are action-only values because click commands have an interacting player. Nametag lines are shared entity metadata and therefore cannot contain a different player value for each viewer.
 
 Nametag line breaks accept `{line}`, `{newLine}`, `{newline}`, `{newLines}`, `{newlines}`, `{breakLine}`, `{breakline}`, `\\n`, `\\r\\n`, `\\r`, and literal newline characters. Minecraft color codes use `&a` style or native `§` formatting.
 
@@ -235,6 +243,9 @@ ScoreHud is optional. NPC detects it at runtime and does not fail to load when S
 {npc.nearest_distance}
 {npc.nearest_entity_id}
 {npc.nearest_type}
+{npc.nearest_variant}
+{npc.nearest_world}
+{npc.nearest_nametag_visibility}
 {npc.nearest_animation}
 {npc.nearest_emote}
 {npc.nearest_motion}
@@ -363,12 +374,15 @@ The CI workflow runs PHP lint, the model smoke test, DevTools preparation, PHPSt
 
 - `storage/NpcRepository` handles `npcs.yml` loading, migration, validation, and saving.
 - `asset/NpcAssetService` handles skin data, Persona snapshots, equipment, and block parsing.
+- `model/VanillaEntityProfile` is the entity capability registry for hitbox size, eye height, rotation mode, and compatible UI controls.
 - `display/NpcDisplayService` handles nametag rendering and visibility metadata.
 - `display/NpcLookAtService` handles nearest-player body and head rotation.
 - `effect/NpcEffectsService` handles particles, sound, actor animation, and player emotes.
 - `integration/NpcCommandService` handles action commands and optional placeholder adapters.
 
 The public commands, UI flow, persistence schema, and entity packet behavior remain exposed through `NpcManager` and `Main`.
+
+The plugin PHP namespace is `AxolotlBucketLabs\NPC`. Integrations that import plugin classes must use this namespace.
 
 ## License
 

@@ -6,15 +6,19 @@ require dirname(__DIR__) . '/src/model/NpcDefinition.php';
 require dirname(__DIR__) . '/src/model/FlightPattern.php';
 require dirname(__DIR__) . '/src/model/EmoteCatalog.php';
 require dirname(__DIR__) . '/src/model/VanillaMobCatalog.php';
+require dirname(__DIR__) . '/src/model/VanillaEntityProfile.php';
+require dirname(__DIR__) . '/src/model/VanillaParticleCatalog.php';
 require dirname(__DIR__) . '/src/model/VanillaSoundCatalog.php';
 require dirname(__DIR__) . '/src/model/VanillaVariantCatalog.php';
 
-use NhanAZ\NPC\model\NpcDefinition;
-use NhanAZ\NPC\model\FlightPattern;
-use NhanAZ\NPC\model\EmoteCatalog;
-use NhanAZ\NPC\model\VanillaMobCatalog;
-use NhanAZ\NPC\model\VanillaSoundCatalog;
-use NhanAZ\NPC\model\VanillaVariantCatalog;
+use AxolotlBucketLabs\NPC\model\NpcDefinition;
+use AxolotlBucketLabs\NPC\model\FlightPattern;
+use AxolotlBucketLabs\NPC\model\EmoteCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaEntityProfile;
+use AxolotlBucketLabs\NPC\model\VanillaParticleCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaSoundCatalog;
+use AxolotlBucketLabs\NPC\model\VanillaVariantCatalog;
 
 $definition = new NpcDefinition(
 	"welcome",
@@ -41,6 +45,9 @@ if($defaultSound->isSoundEnabled()){
 if(!NpcDefinition::fromArray("default-rotate", ["lines" => ["NPC"]])->isRotateEnabled() || VanillaSoundCatalog::resolve("ambient_in_water") !== "ambient.in.water" || VanillaSoundCatalog::resolve("flap") !== "flap"){
 	throw new RuntimeException("NPC defaults or vanilla sound catalog failed");
 }
+if(count(VanillaParticleCatalog::all()) < 30 || VanillaParticleCatalog::resolve("happy-villager") !== "happy_villager" || VanillaParticleCatalog::resolve("not-a-particle") !== null){
+	throw new RuntimeException("Vanilla particle catalog failed");
+}
 $explicitSound = NpcDefinition::fromArray("explicit-sound", ["lines" => ["NPC"], "sound" => true]);
 if(!$explicitSound->isSoundEnabled()){
 	throw new RuntimeException("Explicit sound configuration must remain enabled");
@@ -56,10 +63,17 @@ if($definition->getId() !== "welcome" || count($definition->getLines()) !== 2 ||
 if(count(VanillaMobCatalog::all()) < 90 || VanillaMobCatalog::all()[0] !== "human" || VanillaMobCatalog::resolve("minecraft:zombie") !== "zombie" || VanillaMobCatalog::networkId("allay") !== "minecraft:allay" || VanillaMobCatalog::resolve("falling_block") !== "falling_block" || VanillaMobCatalog::networkId("boat") !== "minecraft:boat" || VanillaMobCatalog::networkId("minecart") !== "minecraft:minecart" || VanillaMobCatalog::networkId("tnt") !== "minecraft:tnt"){
 	throw new RuntimeException("Vanilla entity catalog is incomplete");
 }
-if(VanillaVariantCatalog::default("armadillo") !== "unrolled" || VanillaVariantCatalog::resolve("armadillo", "unrolled")["properties"][0] !== 0 || VanillaVariantCatalog::resolve("armadillo", "rolled_up")["properties"][0] !== 1 || VanillaVariantCatalog::resolve("axolotl", "blue")["metadata"][2] !== 4 || count(VanillaVariantCatalog::options("sheep")) !== 16 || count(VanillaVariantCatalog::options("wolf")) !== 9){
+if(VanillaVariantCatalog::default("armadillo") !== "unrolled" || VanillaVariantCatalog::default("shulker") !== "undyed" || VanillaVariantCatalog::resolve("armadillo", "unrolled")["properties"][0] !== 0 || VanillaVariantCatalog::resolve("armadillo", "rolled_up")["properties"][0] !== 1 || VanillaVariantCatalog::resolve("axolotl", "blue")["metadata"][2] !== 4 || count(VanillaVariantCatalog::options("sheep")) !== 16 || count(VanillaVariantCatalog::options("wolf")) !== 9){
 	throw new RuntimeException("Vanilla entity variant catalog is incomplete");
 }
-if(VanillaMobCatalog::iconPath("bee") !== "textures/items/spawn_eggs/spawn_egg_bee" || VanillaMobCatalog::iconPath("evoker") !== "textures/items/spawn_eggs/spawn_egg_evoker" || VanillaMobCatalog::iconPath("falling_block") !== "textures/blocks/stone" || VanillaMobCatalog::iconPath("boat") !== "textures/items/boat_oak" || VanillaMobCatalog::iconPath("unknown-custom") !== "textures/items/egg"){
+$humanProfile = VanillaMobCatalog::profile("human");
+$boatProfile = VanillaMobCatalog::profile("boat");
+$fallingBlockProfile = VanillaMobCatalog::profile("falling_block");
+$shulkerProfile = VanillaMobCatalog::profile("shulker");
+if(!$humanProfile instanceof VanillaEntityProfile || $humanProfile->getWidth() !== 0.6 || $humanProfile->getHeight() !== 1.8 || $humanProfile->getEyeHeight() !== 1.62 || !$humanProfile->supports("equipment") || !$humanProfile->supports("emote") || $boatProfile->getHeight() !== 0.6 || $boatProfile->getWidth() !== 1.4 || $boatProfile->getSpawnOffsetY() !== 0.49 || !$fallingBlockProfile->supports("block_anchor") || $shulkerProfile->getRotationMode() !== "cardinal" || !$shulkerProfile->supports("variant") || !$shulkerProfile->supports("block_anchor")){
+	throw new RuntimeException("Vanilla entity profiles do not expose hitbox, eye height, rotation, or form capabilities");
+}
+if(VanillaMobCatalog::iconPath("bee") !== "textures/items/spawn_eggs/spawn_egg_bee" || VanillaMobCatalog::iconPath("evoker") !== "textures/items/spawn_eggs/spawn_egg_evoker" || VanillaMobCatalog::iconPath("falling_block") !== "textures/blocks/stone" || VanillaMobCatalog::iconPath("boat") !== "textures/items/boat_oak" || VanillaMobCatalog::iconPath("minecart") !== "textures/items/minecart_normal" || VanillaMobCatalog::iconPath("unknown-custom") !== "textures/items/egg"){
 	throw new RuntimeException("Vanilla form icon paths are invalid");
 }
 $definition->setInteractionMode("separate");
