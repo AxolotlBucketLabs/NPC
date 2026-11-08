@@ -1,0 +1,197 @@
+name: Audit NPC catalogs
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: npc-catalog-audit
+  cancel-in-progress: false
+
+jobs:
+  emotes:
+    name: Refresh emote snapshot
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Prepare catalog update
+        id: prepare
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CATALOG_ERROR_FILE: ${{ runner.temp }}/npc-catalog-error.log
+        run: |
+          set -uo pipefail
+
+          marker='<!-- axolotl-npc-catalog-sync: emotes -->'
+          source_sha=''
+          pr_number=''
+          branch=''
+
+          fail() {
+            echo "result=error" >> "$GITHUB_OUTPUT"
+            echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          if ! git checkout -B main origin/main; then
+            echo "Could not check out the default branch" > "$CATALOG_ERROR_FILE"
+            fail
+          fi
+
+          if ! php tools/update-emote-catalog.php --output="$RUNNER_TEMP/npc-emotes.jsonl" > "$RUNNER_TEMP/npc-catalog-output.log" 2> "$CATALOG_ERROR_FILE"; then
+            fail
+          fi
+
+          entries="$(awk -F= '$1 == "entries" {print $2}' "$RUNNER_TEMP/npc-catalog-output.log")"
+          source_sha="$(awk -F= '$1 == "source_sha" {print $2}' "$RUNNER_TEMP/npc-catalog-output.log")"
+          if [ -z "$entries" ] || [ -z "$source_sha" ]; then
+            echo "The updater did not provide a source revision and entry count" > "$CATALOG_ERROR_FILE"
+            fail
+          fi
+          if ! open_prs="$(gh pr list --state open --limit 100 --json number,headRefName,body)"; then
+            echo "Could not inspect open catalog pull requests" > "$CATALOG_ERROR_FILE"
+            fail
+          fi
+          pr_number="$(jq --raw-output --arg marker "$marker" 'map(select((.body // "") | contains($marker))) | .[0].number // empty' <<< "$open_prs")"
+          open_pr_branch="$(jq --raw-output --arg marker "$marker" 'map(select((.body // "") | contains($marker))) | .[0].headRefName // empty' <<< "$open_prs")"
+
+          if [ -n "$open_pr_branch" ]; then
+            branch="$open_pr_branch"
+            if ! git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"; then
+              echo "Could not fetch the branch used by open catalog PR #$pr_number" > "$CATALOG_ERROR_FILE"
+              fail
+            fi
+            if ! git checkout -B "$branch" "origin/$branch"; then
+              echo "Could not check out the branch used by open catalog PR #$pr_number" > "$CATALOG_ERROR_FILE"
+              fail
+            fi
+          else
+            branch="automation/emote-catalog-${source_sha:0:12}"
+            suffix=2
+            while git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null 2>&1; do
+              branch="automation/emote-catalog-${source_sha:0:12}-$suffix"
+              suffix=$((suffix + 1))
+            done
+            if ! git checkout -b "$branch"; then
+              echo "Could not create the catalog update branch" > "$CATALOG_ERROR_FILE"
+              fail
+            fi
+          fi
+
+          if ! cp "$RUNNER_TEMP/npc-emotes.jsonl" resources/emotes.jsonl; then
+            echo "Could not copy the validated emote snapshot into the update branch" > "$CATALOG_ERROR_FILE"
+            fail
+          fi
+
+          if git diff --quiet -- resources/emotes.jsonl; then
+            echo "result=unchanged" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=changed" >> "$GITHUB_OUTPUT"
+          fi
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "entries=$entries" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Update the open PR or create a new PR
+        if: steps.prepare.outputs.result == 'changed'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CATALOG_BRANCH: ${{ steps.prepare.outputs.branch }}
+          CATALOG_PR_NUMBER: ${{ steps.prepare.outputs.pr_number }}
+          CATALOG_SOURCE_SHA: ${{ steps.prepare.outputs.source_sha }}
+          CATALOG_ENTRIES: ${{ steps.prepare.outputs.entries }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add resources/emotes.jsonl
+          git commit -m "chore(data): update emote catalog"
+          git push --set-upstream origin "$CATALOG_BRANCH"
+
+          body_file="$RUNNER_TEMP/npc-emote-catalog-pr.md"
+          cat > "$body_file" <<EOF
+          <!-- axolotl-npc-catalog-sync: emotes -->
+
+          This PR refreshes the bundled emote title and UUID snapshot from [Bedrock-Emotes](https://github.com/TwistedAsylumMC/Bedrock-Emotes).
+
+          The snapshot contains $CATALOG_ENTRIES entries from source revision $CATALOG_SOURCE_SHA. Please review the generated data before merging.
+          EOF
+
+          if [ -n "$CATALOG_PR_NUMBER" ]; then
+            gh pr edit "$CATALOG_PR_NUMBER" \
+              --title "chore(data): update emote catalog" \
+              --body-file "$body_file"
+          else
+            CATALOG_PR_URL="$(gh pr create \
+              --base main \
+              --head "$CATALOG_BRANCH" \
+              --title "chore(data): update emote catalog" \
+              --body-file "$body_file")"
+          fi
+
+          if [ -z "${CATALOG_PR_URL:-}" ]; then
+            CATALOG_PR_URL="$(gh pr view "$CATALOG_PR_NUMBER" --json url --jq '.url')"
+          fi
+
+          issue_number="$(gh issue list --state open --limit 100 --json number,body --jq 'map(select((.body // "") | contains("<!-- axolotl-npc-catalog-sync-issue: emotes -->"))) | .[0].number // empty')"
+          if [ -n "$issue_number" ]; then
+            issue_body="$RUNNER_TEMP/npc-emote-catalog-issue-resolved.md"
+            {
+              echo '<!-- axolotl-npc-catalog-sync-issue: emotes -->'
+              echo
+              echo "The upstream emote catalog is available again and a pull request is ready for review."
+              echo
+              echo "Pull request: $CATALOG_PR_URL"
+            } > "$issue_body"
+            gh issue edit "$issue_number" --title "chore(data): investigate emote catalog sync" --body-file "$issue_body"
+          fi
+
+      - name: Update the catalog sync issue after a failure
+        if: steps.prepare.outputs.result == 'error'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CATALOG_ERROR_FILE: ${{ runner.temp }}/npc-catalog-error.log
+        run: |
+          set -euo pipefail
+
+          marker='<!-- axolotl-npc-catalog-sync-issue: emotes -->'
+          body_file="$RUNNER_TEMP/npc-emote-catalog-issue.md"
+          {
+            echo "$marker"
+            echo
+            echo "The scheduled emote catalog check could not prepare a valid snapshot from the upstream source."
+            echo
+            echo '```text'
+            if [ -s "$CATALOG_ERROR_FILE" ]; then
+              tail -n 40 "$CATALOG_ERROR_FILE"
+            else
+              echo "The workflow did not provide an error message."
+            fi
+            echo '```'
+            echo
+            echo "The next scheduled run will retry."
+          } > "$body_file"
+
+          issue_number="$(gh issue list --state open --limit 100 --json number,body --jq 'map(select((.body // "") | contains("<!-- axolotl-npc-catalog-sync-issue: emotes -->"))) | .[0].number // empty')"
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" --title "chore(data): investigate emote catalog sync" --body-file "$body_file"
+          else
+            gh issue create --title "chore(data): investigate emote catalog sync" --body-file "$body_file"
+          fi

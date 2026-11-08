@@ -44,13 +44,16 @@ jobs:
 
       - name: Lint PHP sources
         shell: bash
-        run: find src tests -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: find src tests tools -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Run model smoke test
         run: php tests/definition-smoke.php
 
       - name: Run translation smoke test
         run: php tests/translation-smoke.php
+
+      - name: Run emote catalog smoke test
+        run: php tests/emote-catalog-smoke.php
 
       - name: Build and analyze PHAR with DevTools
         id: build
