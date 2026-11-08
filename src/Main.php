@@ -13,6 +13,7 @@ use AxolotlBucketLabs\NPC\integration\ScoreHudIntegration;
 use AxolotlBucketLabs\NPC\manager\NpcManager;
 use AxolotlBucketLabs\NPC\model\EmoteCatalog;
 use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
+use AxolotlBucketLabs\NPC\translation\Translator;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
 use pocketmine\event\Listener;
@@ -30,8 +31,11 @@ final class Main extends PluginBase implements Listener{
 
 	private NpcCommandHandler $commandHandler;
 
+	private Translator $translator;
+
 	protected function onEnable() : void{
 		$this->saveResource("config.yml");
+		$this->translator = new Translator($this);
 		$emoteResource = $this->getResource("emotes.jsonl");
 		if($emoteResource !== null){
 			EmoteCatalog::load((string) stream_get_contents($emoteResource));
@@ -39,7 +43,7 @@ final class Main extends PluginBase implements Listener{
 		}
 
 		$this->npcManager = new NpcManager($this);
-		$this->commandHandler = new NpcCommandHandler($this->npcManager);
+		$this->commandHandler = new NpcCommandHandler($this->npcManager, $this->translator);
 		$this->npcManager->load();
 		$this->npcManager->spawnAll();
 		ScoreHudIntegration::register($this, $this->npcManager);

@@ -1,5 +1,6 @@
 version: 1
 settings:
+  language: eng
   default-cooldown: 0
   rotate-interval-ticks: 10
   particle-interval-ticks: 10

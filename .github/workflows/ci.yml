@@ -49,6 +49,9 @@ jobs:
       - name: Run model smoke test
         run: php tests/definition-smoke.php
 
+      - name: Run translation smoke test
+        run: php tests/translation-smoke.php
+
       - name: Build and analyze PHAR with DevTools
         id: build
         uses: AxolotlBucketLabs/DevTools@0fd73cc2c82d03d0d47f6c7ce119859deda042e3 # v3.3.0

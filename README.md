@@ -30,6 +30,17 @@ The built PHAR contains the PMForms virion. Do not copy the PMForms source into 
 
 The operator UI requires `npc.admin`. The command itself uses `npc.command`, and the `/rca` compatibility command uses `npc.rca`.
 
+## Languages
+
+NPC uses English by default. Set `settings.language` in `config.yml` to select one of the bundled locale codes:
+
+```yaml
+settings:
+  language: vie
+```
+
+The available codes are `bul`, `chs`, `deu`, `eng`, `fra`, `ita`, `jpn`, `kor`, `lav`, `nld`, `rus`, `spa`, `tur`, and `vie`. The selected language applies to command feedback and the operator UI. Technical identifiers, command syntax, UUIDs, configured NPC text, and catalog data remain unchanged. Missing entries fall back to English, so custom locale files can be extended without breaking the plugin.
+
 ## Quick start
 
 The shortest in-game workflow is:

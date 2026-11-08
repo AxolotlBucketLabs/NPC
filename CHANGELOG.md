@@ -6,6 +6,7 @@ All notable changes to NPC are documented here.
 
 ### Added
 
+- Add configurable command and operator UI localization with 14 bundled language codes and English fallback.
 - Add capability-aware profiles for hitboxes, eye height, rotation, variants, and editor controls.
 - Add vanilla entity variants, particle types, sound events, player-emote browsing, and ScoreHud tags.
 - Add NPC nametag and click-action placeholders for IDs, entity types, variants, coordinates, and player UUIDs.

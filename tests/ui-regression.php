@@ -37,7 +37,7 @@ if(preg_match('/public function syncNametagVisibility\(.*?\r?\n\t}\r?\n/s', $dis
 	throw new RuntimeException('Live nametag mode changes must update metadata without respawning the actor or re-sending its skin');
 }
 
-if(!str_contains($uiSource, 'new Input("id", "Stable NPC ID", "NPC_0", $suggestedId)') || !str_contains($uiSource, '$this->manager->getNextSuggestedId()')){
+if(!str_contains($uiSource, 'new Input("id", $this->t("ui.stable_id"), "NPC_0", $suggestedId)') || !str_contains($uiSource, '$this->manager->getNextSuggestedId()')){
 	throw new RuntimeException('NPC create form must show an editable auto-incrementing ID suggestion');
 }
 
@@ -50,7 +50,7 @@ if(str_contains($uiSource, 'new MenuOption("Browse Entity Types")') || str_conta
 	throw new RuntimeException('The main NPC menu must keep entity and emote browsers out of the primary actions');
 }
 
-if(!str_contains($uiSource, 'private function openEntityBrowser') || !str_contains($uiSource, 'new MenuOption("Search entity types")') || !str_contains($uiSource, 'private function openEntitySearch') || !str_contains($uiSource, 'Special actors\\nBoat, Falling Block, Minecart, Primed TNT') || !str_contains($uiSource, 'new FormIcon(VanillaMobCatalog::iconPath("boat"), FormIcon::IMAGE_TYPE_PATH)') || !str_contains($uiSource, 'new FormIcon(VanillaMobCatalog::iconPath($type), FormIcon::IMAGE_TYPE_PATH)')){
+if(!str_contains($uiSource, 'private function openEntityBrowser') || !str_contains($uiSource, 'new MenuOption($this->t("ui.search_entity_types"))') || !str_contains($uiSource, 'private function openEntitySearch') || !str_contains($uiSource, '$this->t("ui.special_actors") . "\\nBoat') || !str_contains($uiSource, 'new FormIcon(VanillaMobCatalog::iconPath("boat"), FormIcon::IMAGE_TYPE_PATH)') || !str_contains($uiSource, 'new FormIcon(VanillaMobCatalog::iconPath($type), FormIcon::IMAGE_TYPE_PATH)')){
 	throw new RuntimeException('Entity type editing must open the type menu first and keep search inside that menu');
 }
 
@@ -58,7 +58,7 @@ if(!str_contains($uiSource, 'private array $editReturnsToList') || !str_contains
 	throw new RuntimeException('Direct NPC editing must not show a list Back button');
 }
 
-if(preg_match('/private function openSkin\(.*?\r?\n\t}\r?\n/s', $uiSource, $match) !== 1 || !str_contains($match[0], 'new MenuForm') || !str_contains($match[0], 'new MenuOption("Use local skin file")') || !str_contains($match[0], 'new MenuOption("Use HTTPS skin URL")') || !str_contains($match[0], 'new MenuOption("Player skin")') || !str_contains($uiSource, 'private function openPlayerSkin')){
+if(preg_match('/private function openSkin\(.*?\r?\n\t}\r?\n/s', $uiSource, $match) !== 1 || !str_contains($match[0], 'new MenuForm') || !str_contains($match[0], 'new MenuOption($this->t("ui.use_local_skin"))') || !str_contains($match[0], 'new MenuOption($this->t("ui.use_https_skin"))') || !str_contains($match[0], 'new MenuOption($this->t("ui.player_skin"))') || !str_contains($uiSource, 'private function openPlayerSkin')){
 	throw new RuntimeException('Skin source must expose local, HTTPS, and player-skin modes');
 }
 
@@ -110,7 +110,7 @@ foreach([$mobSource, $actorSource, $blockSource] as $entitySource){
 	}
 }
 
-if(!str_contains($managerSource, 'VanillaMobCatalog::profile($entityType)') || !str_contains($managerSource, 'getParticleCount()') || !str_contains($lookAtSource, 'rotateTowardsNearestPlayer') || !str_contains($uiSource, 'private function openLookAt') || !str_contains($uiSource, 'Look at nearby players')){
+if(!str_contains($managerSource, 'VanillaMobCatalog::profile($entityType)') || !str_contains($managerSource, 'getParticleCount()') || !str_contains($lookAtSource, 'rotateTowardsNearestPlayer') || !str_contains($uiSource, 'private function openLookAt') || !str_contains($uiSource, 'ui.look_at_nearby_players')){
 	throw new RuntimeException('NPC manager/UI is missing dimension-aware actors, particle bursts, or look-at settings');
 }
 
@@ -179,15 +179,15 @@ foreach(['npc.nearest_variant', 'npc.nearest_world', 'npc.nearest_nametag_visibi
 	}
 }
 
-if(!str_contains($uiSource, 'new MenuOption("Sound")') || !str_contains($uiSource, 'new MenuOption("Particles")') || !str_contains($uiSource, 'private function openSoundBrowser') || !str_contains($uiSource, 'private function openParticleBrowser') || !str_contains($uiSource, 'VanillaSoundCatalog::all()') || !str_contains($uiSource, 'VanillaParticleCatalog::all()') || !str_contains($effectsSource, 'new BedrockSound')){
+if(!str_contains($uiSource, 'new MenuOption($this->t("ui.sound"))') || !str_contains($uiSource, 'new MenuOption($this->t("ui.particles"))') || !str_contains($uiSource, 'private function openSoundBrowser') || !str_contains($uiSource, 'private function openParticleBrowser') || !str_contains($uiSource, 'VanillaSoundCatalog::all()') || !str_contains($uiSource, 'VanillaParticleCatalog::all()') || !str_contains($effectsSource, 'new BedrockSound')){
 	throw new RuntimeException('NPC effects must split sound and particle browser menus backed by vanilla catalogs');
 }
 
-if(!str_contains($uiSource, 'private function openActorAnimationSettings') || !str_contains($uiSource, '$this->openEmoteResults($player, $id, "", 0)') || !str_contains($uiSource, 'new MenuOption("Clear active animation")') || str_contains($uiSource, 'private function openAnimationSettings')){
+if(!str_contains($uiSource, 'private function openActorAnimationSettings') || !str_contains($uiSource, '$this->openEmoteResults($player, $id, "", 0)') || !str_contains($uiSource, 'new MenuOption($this->t("ui.clear_animation"))') || str_contains($uiSource, 'private function openAnimationSettings')){
 	throw new RuntimeException('Actor animations and player emotes must use separate, non-conflicting UI flows');
 }
 
-if(!str_contains($uiSource, 'private function openPlayerCountWorld') || !str_contains($uiSource, 'private function openPlayerCountQuery') || !str_contains($uiSource, '"world" => "This world"') || !str_contains($uiSource, '"query" => "BedrockQuery host"')){
+if(!str_contains($uiSource, 'private function openPlayerCountWorld') || !str_contains($uiSource, 'private function openPlayerCountQuery') || !str_contains($uiSource, '"world" => $this->t("ui.this_world")') || !str_contains($uiSource, '"query" => $this->t("ui.bedrock_query_host")')){
 	throw new RuntimeException('Player count must use separate mode and configuration forms');
 }
 

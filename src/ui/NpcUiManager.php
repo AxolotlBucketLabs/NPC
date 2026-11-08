@@ -10,6 +10,7 @@ use AxolotlBucketLabs\NPC\model\VanillaMobCatalog;
 use AxolotlBucketLabs\NPC\model\VanillaParticleCatalog;
 use AxolotlBucketLabs\NPC\model\VanillaSoundCatalog;
 use AxolotlBucketLabs\NPC\model\VanillaVariantCatalog;
+use AxolotlBucketLabs\NPC\translation\Translator;
 use dktapps\pmforms\CustomForm;
 use dktapps\pmforms\CustomFormResponse;
 use dktapps\pmforms\FormIcon;
@@ -40,17 +41,22 @@ final class NpcUiManager{
 	/** @var array<string, bool> */
 	private array $editReturnsToList = [];
 
-	public function __construct(private NpcManager $manager){
+	public function __construct(private NpcManager $manager, private Translator $translator){
+	}
+
+	/** @param array<string, scalar> $parameters */
+	private function t(string $key, array $parameters = []) : string{
+		return $this->translator->translate($key, $parameters);
 	}
 
 	public function openMain(Player $player) : void{
 		$this->editReturnsToList[strtolower($player->getName())] = true;
 		$player->sendForm(new MenuForm(
-			"NPC Manager",
-			"Choose an NPC management action.",
+			$this->t("ui.manager_title"),
+			$this->t("ui.manager_description"),
 			[
-				new MenuOption("Create NPC"),
-				new MenuOption("List NPCs")
+				new MenuOption($this->t("ui.create_npc")),
+				new MenuOption($this->t("ui.list_npcs"))
 			],
 			function(Player $player, int $selected) : void{
 				switch($selected){
@@ -73,21 +79,21 @@ final class NpcUiManager{
 	private function openCreate(Player $player) : void{
 		$suggestedId = $this->manager->getNextSuggestedId();
 		$player->sendForm(new CustomForm(
-			"Create NPC",
+			$this->t("ui.create_title"),
 			[
-				new Input("id", "Stable NPC ID", "NPC_0", $suggestedId),
-				new Input("name", "Nametag", "Welcome NPC")
+				new Input("id", $this->t("ui.stable_id"), "NPC_0", $suggestedId),
+				new Input("name", $this->t("ui.nametag"), $this->t("ui.welcome_npc"))
 			],
 			function(Player $player, CustomFormResponse $response) : void{
 				$id = trim($response->getString("id"));
 				$name = trim($response->getString("name"));
 				if($id === ""){
-					$player->sendMessage(TextFormat::RED . "NPC ID cannot be empty.");
+					$player->sendMessage(TextFormat::RED . $this->t("ui.id_empty"));
 					return;
 				}
 				try{
 					$this->manager->create($player, $id, $name);
-					$player->sendMessage(TextFormat::GREEN . "NPC '$id' created.");
+					$player->sendMessage(TextFormat::GREEN . $this->t("ui.created", ["id" => $id]));
 				}catch(\Throwable $error){
 					$player->sendMessage(TextFormat::RED . $error->getMessage());
 				}
@@ -101,12 +107,12 @@ final class NpcUiManager{
 	}
 
 	private function openEntitySearch(Player $player, ?string $npcId = null, string $initialQuery = "") : void{
-		$title = $npcId === null ? "Search entity types" : "Search entity types: " . $npcId;
+		$title = $npcId === null ? $this->t("ui.search_entity_types") : $this->t("ui.search_entity_types_for", ["id" => $npcId]);
 		$player->sendForm(new CustomForm(
 			$title,
 			[
-				new Label("info", "Search is optional. The entity type menu also has pages and Vanilla icons."),
-				new Input("query", "Search entity", "zombie, golem, falling...", $initialQuery)
+				new Label("info", $this->t("ui.entity_search_info")),
+				new Input("query", $this->t("ui.search_entity"), "zombie, golem, falling...", $initialQuery)
 			],
 			function(Player $player, CustomFormResponse $response) use ($npcId) : void{
 				$query = trim($response->getString("query"));
@@ -139,10 +145,10 @@ final class NpcUiManager{
 		$page = min(max(0, $page), $pageCount - 1);
 		$offset = $page * $pageSize;
 		$pageTypes = array_slice($types, $offset, $pageSize);
-		$options = [new MenuOption("Back"), new MenuOption("Search entity types")];
+		$options = [new MenuOption($this->t("ui.back")), new MenuOption($this->t("ui.search_entity_types"))];
 		$actions = ["back", "search"];
 		if($page > 0){
-			$options[] = new MenuOption("Previous page");
+			$options[] = new MenuOption($this->t("ui.previous_page"));
 			$actions[] = "previous";
 		}
 		foreach($pageTypes as $type){
@@ -153,23 +159,23 @@ final class NpcUiManager{
 			$actions[] = "entity:" . $type;
 		}
 		if($page + 1 < $pageCount){
-			$options[] = new MenuOption("Next page");
+			$options[] = new MenuOption($this->t("ui.next_page"));
 			$actions[] = "next";
 		}elseif($normalizedQuery === ""){
 			$options[] = new MenuOption(
-				"Special actors\nBoat, Falling Block, Minecart, Primed TNT",
+				$this->t("ui.special_actors") . "\nBoat, Falling Block, Minecart, Primed TNT",
 				new FormIcon(VanillaMobCatalog::iconPath("boat"), FormIcon::IMAGE_TYPE_PATH)
 			);
 			$actions[] = "special";
 		}
 
-		$target = $npcId === null ? "" : " for " . $npcId;
-		$description = "Select an entity" . $target . ".\n" . count($types) . " result(s), page " . ($page + 1) . "/" . $pageCount;
+		$target = $npcId === null ? "" : $this->t("ui.for_id", ["id" => $npcId]);
+		$description = $this->t("ui.entity_results", ["target" => $target, "count" => count($types), "page" => $page + 1, "pages" => $pageCount]);
 		if($normalizedQuery !== ""){
-			$description .= "\nSearch: " . $query;
+			$description .= "\n" . $this->t("ui.search_value", ["query" => $query]);
 		}
 		$player->sendForm(new MenuForm(
-			"Entity types" . $target,
+			$this->t("ui.entity_types_title", ["target" => $target]),
 			$description,
 			$options,
 			function(Player $player, int $selected) use ($actions, $npcId, $query, $page) : void{
@@ -204,7 +210,7 @@ final class NpcUiManager{
 	}
 
 	private function openSpecialEntityBrowser(Player $player, ?string $npcId = null) : void{
-		$options = [new MenuOption("Back")];
+		$options = [new MenuOption($this->t("ui.back"))];
 		$actions = ["back"];
 		foreach(VanillaMobCatalog::specialActorTypes() as $type){
 			$options[] = new MenuOption(
@@ -213,10 +219,10 @@ final class NpcUiManager{
 			);
 			$actions[] = "entity:" . $type;
 		}
-		$target = $npcId === null ? "" : " for " . $npcId;
+		$target = $npcId === null ? "" : $this->t("ui.for_id", ["id" => $npcId]);
 		$player->sendForm(new MenuForm(
-			"Special actors" . $target,
-			"These object-like actors are kept together because they use dedicated visual origins.",
+			$this->t("ui.special_actors_title", ["target" => $target]),
+			$this->t("ui.special_actors_description"),
 			$options,
 			function(Player $player, int $selected) use ($actions, $npcId) : void{
 				$action = $actions[$selected] ?? "back";
@@ -239,9 +245,9 @@ final class NpcUiManager{
 			return;
 		}
 		if($this->manager->setEntityType($npcId, $type)){
-			$player->sendMessage(TextFormat::GREEN . "NPC entity type updated to " . VanillaMobCatalog::displayName($type) . ".");
+			$player->sendMessage(TextFormat::GREEN . $this->t("ui.entity_type_updated", ["type" => VanillaMobCatalog::displayName($type)]));
 		}else{
-			$player->sendMessage(TextFormat::RED . "NPC not found.");
+			$player->sendMessage(TextFormat::RED . $this->t("cmd.not_found"));
 		}
 		if($type === "falling_block"){
 			$this->openBlockVisual($player, $npcId);
@@ -261,13 +267,13 @@ final class NpcUiManager{
 		}
 		$worlds = array_keys($worldCounts);
 		sort($worlds, SORT_NATURAL | SORT_FLAG_CASE);
-		$options = [new MenuOption("Back")];
+		$options = [new MenuOption($this->t("ui.back"))];
 		foreach($worlds as $world){
 			$options[] = new MenuOption($world . " (" . $worldCounts[$world] . ")");
 		}
 		$player->sendForm(new MenuForm(
-			"NPC worlds (" . count($this->manager->getDefinitions()) . ")",
-			$worlds === [] ? "No NPCs have been created yet." : "Select a world to browse its NPCs.",
+			$this->t("ui.npc_worlds", ["count" => count($this->manager->getDefinitions())]),
+			$worlds === [] ? $this->t("ui.no_npcs") : $this->t("ui.select_world"),
 			$options,
 			function(Player $player, int $selected) use ($worlds) : void{
 				if($selected === 0){
@@ -288,7 +294,7 @@ final class NpcUiManager{
 			}
 		}
 		sort($ids, SORT_NATURAL | SORT_FLAG_CASE);
-		$options = [new MenuOption("Back")];
+		$options = [new MenuOption($this->t("ui.back"))];
 		foreach($ids as $id){
 			$definition = $this->manager->getDefinition($id);
 			if($definition !== null){
@@ -296,8 +302,8 @@ final class NpcUiManager{
 			}
 		}
 		$player->sendForm(new MenuForm(
-			"NPCs: " . $world . " (" . count($ids) . ")",
-			$ids === [] ? "No NPCs exist in this world." : "Select an NPC to edit.",
+			$this->t("ui.npcs_in_world", ["world" => $world, "count" => count($ids)]),
+			$ids === [] ? $this->t("ui.no_npcs_in_world") : $this->t("ui.select_npc"),
 			$options,
 			function(Player $player, int $selected) use ($ids) : void{
 				if($selected === 0){
@@ -314,7 +320,7 @@ final class NpcUiManager{
 	private function openEdit(Player $player, string $id) : void{
 		$definition = $this->manager->getDefinition($id);
 		if($definition === null){
-			$player->sendMessage(TextFormat::RED . "NPC not found.");
+			$player->sendMessage(TextFormat::RED . $this->t("cmd.not_found"));
 			return;
 		}
 		$entityType = VanillaMobCatalog::resolve($definition->getEntityType()) ?? $definition->getEntityType();
@@ -325,44 +331,44 @@ final class NpcUiManager{
 		$isBlock = $entityType === "falling_block";
 		$hasActorAnimation = $profile->supports("actor_animation");
 		$options = [
-			new MenuOption("Identity & display"),
-			new MenuOption("Entity type")
+			new MenuOption($this->t("ui.identity_display")),
+			new MenuOption($this->t("ui.entity_type"))
 		];
 		$actions = ["identity", "entity"];
 		if(VanillaVariantCatalog::hasVariants($entityType)){
 			$currentVariant = $definition->getVariant() !== "" ? $definition->getVariant() : VanillaVariantCatalog::default($entityType);
-			$options[] = new MenuOption("Variant: " . VanillaVariantCatalog::label($entityType, $currentVariant));
+			$options[] = new MenuOption($this->t("ui.variant", ["value" => VanillaVariantCatalog::label($entityType, $currentVariant)]));
 			$actions[] = "variant";
 		}
 		if($isHuman || $isBlock){
-			$options[] = new MenuOption("Appearance");
+			$options[] = new MenuOption($this->t("ui.appearance"));
 			$actions[] = "appearance";
 		}
 		if($isHuman || $hasActorAnimation){
-			$options[] = new MenuOption($isHuman ? "Animations & emotes" : "Animation");
+			$options[] = new MenuOption($isHuman ? $this->t("ui.animations_emotes") : $this->t("ui.animation"));
 			$actions[] = "animation";
 		}
-		$options[] = new MenuOption("Sound & particles");
+		$options[] = new MenuOption($this->t("ui.sound_particles"));
 		$actions[] = "effects";
-		$options[] = new MenuOption("Interaction & actions");
+		$options[] = new MenuOption($this->t("ui.interaction_actions"));
 		$actions[] = "interaction";
 		if($profile->supports("look_at")){
-			$options[] = new MenuOption("Look at nearby players");
+			$options[] = new MenuOption($this->t("ui.look_at_nearby_players"));
 			$actions[] = "look_at";
 		}
-		$options[] = new MenuOption("Player count");
+		$options[] = new MenuOption($this->t("ui.player_count"));
 		$actions[] = "player_count";
-		$options[] = new MenuOption("Location");
+		$options[] = new MenuOption($this->t("ui.location"));
 		$actions[] = "location";
-		$options[] = new MenuOption("Delete NPC");
+		$options[] = new MenuOption($this->t("ui.delete_npc"));
 		$actions[] = "delete";
 		if($returnToList){
-			$options[] = new MenuOption("Back");
+			$options[] = new MenuOption($this->t("ui.back"));
 			$actions[] = "back";
 		}
 		$player->sendForm(new MenuForm(
-			"Edit NPC: " . $id,
-			"Type: " . VanillaMobCatalog::displayName($entityType) . ". Only compatible settings are shown.",
+			$this->t("ui.edit_title", ["id" => $id]),
+			$this->t("ui.edit_description", ["type" => VanillaMobCatalog::displayName($entityType)]),
 			$options,
 			function(Player $player, int $selected) use ($id, $actions, $returnToList) : void{
 				switch($actions[$selected] ?? "back"){
@@ -400,15 +406,15 @@ final class NpcUiManager{
 			return;
 		}
 		$currentVariant = $definition->getVariant() !== "" ? $definition->getVariant() : VanillaVariantCatalog::default($entityType);
-		$options = [new MenuOption("Back")];
+		$options = [new MenuOption($this->t("ui.back"))];
 		$actions = ["back"];
 		foreach($variants as $variantId => $variant){
-			$options[] = new MenuOption($variant["label"] . ($variantId === $currentVariant ? " (current)" : ""));
+			$options[] = new MenuOption($variant["label"] . ($variantId === $currentVariant ? " (" . $this->t("ui.current") . ")" : ""));
 			$actions[] = $variantId;
 		}
 		$player->sendForm(new MenuForm(
-			"Variant: " . $id,
-			"Choose the saved visual/state variant for " . VanillaMobCatalog::displayName($entityType) . ".",
+			$this->t("ui.variant_title", ["id" => $id]),
+			$this->t("ui.variant_description", ["type" => VanillaMobCatalog::displayName($entityType)]),
 			$options,
 			function(Player $player, int $selected) use ($id, $actions, $entityType) : void{
 				$action = $actions[$selected] ?? "back";
@@ -417,9 +423,9 @@ final class NpcUiManager{
 					return;
 				}
 				if($this->manager->setVariant($id, $action)){
-					$player->sendMessage(TextFormat::GREEN . "NPC variant updated to " . VanillaVariantCatalog::label($entityType, $action) . ".");
+					$player->sendMessage(TextFormat::GREEN . $this->t("ui.variant_updated", ["value" => VanillaVariantCatalog::label($entityType, $action)]));
 				}else{
-					$player->sendMessage(TextFormat::RED . "That variant is not valid for this entity.");
+					$player->sendMessage(TextFormat::RED . $this->t("ui.variant_invalid"));
 				}
 				$this->openEdit($player, $id);
 			},
@@ -434,12 +440,12 @@ final class NpcUiManager{
 		}
 		$nametagVisibilityValues = ["never", "hover", "always"];
 		$elements = [
-			new Input("name", "Nametag line 1 (blank clears)", "NPC", $definition->getLines()[0] ?? "NPC"),
-			new Input("scale", "Scale", "1", (string) $definition->getScale()),
-			new Dropdown("nametag_visibility", "Nametag visibility", ["Never", "Hover", "Always"], max(0, array_search($definition->getNametagVisibility(), $nametagVisibilityValues, true)))
+			new Input("name", $this->t("ui.nametag_line"), "NPC", $definition->getLines()[0] ?? "NPC"),
+			new Input("scale", $this->t("ui.scale"), "1", (string) $definition->getScale()),
+			new Dropdown("nametag_visibility", $this->t("ui.nametag_visibility"), [$this->t("ui.never"), $this->t("ui.hover"), $this->t("ui.always")], max(0, array_search($definition->getNametagVisibility(), $nametagVisibilityValues, true)))
 		];
 		$player->sendForm(new CustomForm(
-			"Identity & display: " . $id,
+			$this->t("ui.identity_title", ["id" => $id]),
 			$elements,
 			function(Player $player, CustomFormResponse $response) use ($id, $nametagVisibilityValues) : void{
 				$name = trim($response->getString("name"));
@@ -448,7 +454,7 @@ final class NpcUiManager{
 					$this->manager->setScale($id, (float) $response->getString("scale"));
 				}
 				$this->manager->setNametagVisibility($id, $nametagVisibilityValues[$response->getInt("nametag_visibility")] ?? "always");
-				$player->sendMessage(TextFormat::GREEN . "NPC '$id' updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.updated", ["id" => $id]));
 				$this->openEdit($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -464,19 +470,19 @@ final class NpcUiManager{
 		$options = [];
 		$actions = [];
 		if(VanillaMobCatalog::isHuman($entityType)){
-			$options[] = new MenuOption("Equipment");
+			$options[] = new MenuOption($this->t("ui.equipment"));
 			$actions[] = "equipment";
-			$options[] = new MenuOption("Skin source");
+			$options[] = new MenuOption($this->t("ui.skin_source"));
 			$actions[] = "skin";
 		}elseif($entityType === "falling_block"){
-			$options[] = new MenuOption("Block visual");
+			$options[] = new MenuOption($this->t("ui.block_visual"));
 			$actions[] = "block";
 		}
-		$options[] = new MenuOption("Back");
+		$options[] = new MenuOption($this->t("ui.back"));
 		$actions[] = "back";
 		$player->sendForm(new MenuForm(
-			"Appearance: " . $id,
-			"Only settings supported by " . VanillaMobCatalog::displayName($entityType) . " are shown.",
+			$this->t("ui.appearance_title", ["id" => $id]),
+			$this->t("ui.appearance_description", ["type" => VanillaMobCatalog::displayName($entityType)]),
 			$options,
 			function(Player $player, int $selected) use ($id, $actions) : void{
 				switch($actions[$selected] ?? "back"){
@@ -497,22 +503,22 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Block visual: " . $id,
+			$this->t("ui.block_visual_title", ["id" => $id]),
 			[
-				new Label("info", "Use a modern block name such as stone or minecraft:oak_planks. Numeric legacy IDs are compatibility-only."),
-				new Input("block", "Block name", "stone", $definition->getBlockId())
+				new Label("info", $this->t("ui.block_visual_info")),
+				new Input("block", $this->t("ui.block_name"), "stone", $definition->getBlockId())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$block = trim($response->getString("block"));
 				if($block === "" || strtolower($block) === "clear"){
-					$player->sendMessage(TextFormat::RED . "A falling_block NPC needs a valid block name.");
+					$player->sendMessage(TextFormat::RED . $this->t("ui.block_required"));
 					return;
 				}
 				if(!$this->manager->setBlockId($id, $block)){
-					$player->sendMessage(TextFormat::RED . "That block name is invalid.");
+					$player->sendMessage(TextFormat::RED . $this->t("ui.block_invalid"));
 					return;
 				}
-				$player->sendMessage(TextFormat::GREEN . "Block visual updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.block_updated"));
 				$this->openAppearance($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -526,14 +532,14 @@ final class NpcUiManager{
 		}
 		$currentSource = $definition->getSkinUrl() !== "" ? "HTTPS URL" : ($definition->getSkinFile() !== "" ? "Local skin file" : "Current/default skin");
 		$player->sendForm(new MenuForm(
-			"Skin source: " . $id,
-			"Current source: " . $currentSource . ". Choose a saved skin source.",
+			$this->t("ui.skin_source_title", ["id" => $id]),
+			$this->t("ui.skin_source_description", ["source" => $currentSource]),
 			[
-				new MenuOption("Use local skin file"),
-				new MenuOption("Use HTTPS skin URL"),
-				new MenuOption("Player skin"),
-				new MenuOption("Clear custom skin"),
-				new MenuOption("Back")
+				new MenuOption($this->t("ui.use_local_skin")),
+				new MenuOption($this->t("ui.use_https_skin")),
+				new MenuOption($this->t("ui.player_skin")),
+				new MenuOption($this->t("ui.clear_custom_skin")),
+				new MenuOption($this->t("ui.back"))
 			],
 			function(Player $player, int $selected) use ($id) : void{
 				switch($selected){
@@ -548,7 +554,7 @@ final class NpcUiManager{
 						break;
 					case 3:
 						$ok = $this->manager->setSkinUrl($id, "") && $this->manager->setSkinFile($id, "");
-						$player->sendMessage($ok ? TextFormat::GREEN . "Custom skin cleared." : TextFormat::RED . "Custom skin could not be cleared.");
+						$player->sendMessage($ok ? TextFormat::GREEN . $this->t("ui.custom_skin_cleared") : TextFormat::RED . $this->t("ui.custom_skin_clear_failed"));
 						$this->openAppearance($player, $id);
 						break;
 					case 4:
@@ -561,20 +567,20 @@ final class NpcUiManager{
 	}
 
 	private function openPlayerSkin(Player $player, string $id) : void{
-		$options = [new MenuOption("Use my current player skin")];
+		$options = [new MenuOption($this->t("ui.use_current_skin"))];
 		$actions = ["current"];
 		foreach($player->getServer()->getOnlinePlayers() as $onlinePlayer){
 			if(strtolower($onlinePlayer->getName()) === strtolower($player->getName())){
 				continue;
 			}
-			$options[] = new MenuOption("Use " . $onlinePlayer->getName() . "'s skin");
+			$options[] = new MenuOption($this->t("ui.use_player_skin", ["name" => $onlinePlayer->getName()]));
 			$actions[] = "player:" . $onlinePlayer->getName();
 		}
-		$options[] = new MenuOption("Back");
+		$options[] = new MenuOption($this->t("ui.back"));
 		$actions[] = "back";
 		$player->sendForm(new MenuForm(
-			"Player skin: " . $id,
-			"Choose the player skin to persist on this Human NPC. The other player must be online now.",
+			$this->t("ui.player_skin_title", ["id" => $id]),
+			$this->t("ui.player_skin_description"),
 			$options,
 			function(Player $player, int $selected) use ($id, $actions) : void{
 				$action = $actions[$selected] ?? "back";
@@ -584,7 +590,7 @@ final class NpcUiManager{
 				}
 				if($action === "current"){
 					$ok = $this->manager->setSkinUrl($id, "") && $this->manager->setSkinFromPlayer($player, $id);
-					$player->sendMessage($ok ? TextFormat::GREEN . "Your player skin was saved to the NPC." : TextFormat::RED . "Your player skin could not be saved.");
+					$player->sendMessage($ok ? TextFormat::GREEN . $this->t("ui.current_skin_saved") : TextFormat::RED . $this->t("ui.current_skin_save_failed"));
 					$this->openAppearance($player, $id);
 					return;
 				}
@@ -592,7 +598,7 @@ final class NpcUiManager{
 					$name = substr($action, 7);
 					$target = $player->getServer()->getPlayerExact($name);
 					$ok = $target !== null && $this->manager->setSkinUrl($id, "") && $this->manager->setSkinFromPlayer($target, $id);
-					$player->sendMessage($ok ? TextFormat::GREEN . "Player skin from " . $name . " was saved to the NPC." : TextFormat::RED . "That player is no longer online or their skin could not be saved.");
+					$player->sendMessage($ok ? TextFormat::GREEN . $this->t("ui.other_skin_saved", ["name" => $name]) : TextFormat::RED . $this->t("ui.other_skin_save_failed"));
 					$this->openAppearance($player, $id);
 				}
 			},
@@ -606,14 +612,14 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Local skin file: " . $id,
+			$this->t("ui.local_skin_title", ["id" => $id]),
 			[
-				new Label("info", "Enter a validated file under plugin_data/NPC/skins."),
-				new Input("file", "Skin file", "skin.rgba", $definition->getSkinFile())
+				new Label("info", $this->t("ui.local_skin_info")),
+				new Input("file", $this->t("ui.skin_file"), "skin.rgba", $definition->getSkinFile())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$ok = $this->manager->setSkinUrl($id, "") && $this->manager->setSkinFile($id, trim($response->getString("file")));
-				$player->sendMessage($ok ? TextFormat::GREEN . "Local skin file updated." : TextFormat::RED . "Local skin file could not be updated.");
+				$player->sendMessage($ok ? TextFormat::GREEN . $this->t("ui.local_skin_updated") : TextFormat::RED . $this->t("ui.local_skin_update_failed"));
 				$this->openAppearance($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -626,14 +632,14 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"HTTPS skin URL: " . $id,
+			$this->t("ui.skin_url_title", ["id" => $id]),
 			[
-				new Label("info", "The URL must pass the configured HTTPS host allowlist."),
-				new Input("url", "Skin URL", "https://textures.minecraft.net/...", $definition->getSkinUrl())
+				new Label("info", $this->t("ui.skin_url_info")),
+				new Input("url", $this->t("ui.skin_url"), "https://textures.minecraft.net/...", $definition->getSkinUrl())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$ok = $this->manager->setSkinFile($id, "") && $this->manager->setSkinUrl($id, trim($response->getString("url")));
-				$player->sendMessage($ok ? TextFormat::GREEN . "HTTPS skin URL updated." : TextFormat::RED . "HTTPS skin URL could not be updated.");
+				$player->sendMessage($ok ? TextFormat::GREEN . $this->t("ui.skin_url_updated") : TextFormat::RED . $this->t("ui.skin_url_update_failed"));
 				$this->openAppearance($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -646,15 +652,15 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new MenuForm(
-			"Interaction: " . $id,
-			"Shared actions run for both clicks. Separate mode additionally runs the matching click list.",
+			$this->t("ui.interaction_title", ["id" => $id]),
+			$this->t("ui.interaction_description"),
 			[
-				new MenuOption("Shared actions (both clicks)"),
-				new MenuOption("Right-click actions"),
-				new MenuOption("Left-click actions"),
-				new MenuOption("Interaction mode: " . $definition->getInteractionMode()),
-				new MenuOption("Cooldown: " . $definition->getCooldown() . "s"),
-				new MenuOption("Back")
+				new MenuOption($this->t("ui.shared_actions")),
+				new MenuOption($this->t("ui.right_click_actions")),
+				new MenuOption($this->t("ui.left_click_actions")),
+				new MenuOption($this->t("ui.interaction_mode", ["mode" => $definition->getInteractionMode()])),
+				new MenuOption($this->t("ui.cooldown", ["seconds" => $definition->getCooldown()])),
+				new MenuOption($this->t("ui.back"))
 			],
 			function(Player $player, int $selected) use ($id) : void{
 				switch($selected){
@@ -677,14 +683,14 @@ final class NpcUiManager{
 		}
 		$values = ["shared", "separate"];
 		$player->sendForm(new CustomForm(
-			"Interaction mode: " . $id,
+			$this->t("ui.interaction_mode_title", ["id" => $id]),
 			[
-				new Label("info", "Shared mode runs one action list for both clicks. Separate mode also runs the matching click list."),
-				new Dropdown("mode", "Mode", ["Shared", "Separate"], max(0, array_search($definition->getInteractionMode(), $values, true)))
+				new Label("info", $this->t("ui.interaction_mode_info")),
+				new Dropdown("mode", $this->t("ui.mode"), [$this->t("ui.shared"), $this->t("ui.separate")], max(0, array_search($definition->getInteractionMode(), $values, true)))
 			],
 			function(Player $player, CustomFormResponse $response) use ($id, $values) : void{
 				$this->manager->setInteractionMode($id, $values[$response->getInt("mode")] ?? "shared");
-				$player->sendMessage(TextFormat::GREEN . "Interaction mode updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("cmd.interaction_updated"));
 				$this->openInteraction($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -697,16 +703,16 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Cooldown: " . $id,
-			[new Input("seconds", "Seconds per player (0 disables)", "0", (string) $definition->getCooldown())],
+			$this->t("ui.cooldown_title", ["id" => $id]),
+			[new Input("seconds", $this->t("ui.seconds_per_player"), "0", (string) $definition->getCooldown())],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$value = $response->getString("seconds");
 				if(!is_numeric($value) || (float) $value < 0){
-					$player->sendMessage(TextFormat::RED . "Cooldown must be a non-negative number.");
+					$player->sendMessage(TextFormat::RED . $this->t("ui.cooldown_invalid"));
 					return;
 				}
 				$this->manager->setCooldown($id, (float) $value);
-				$player->sendMessage(TextFormat::GREEN . "Cooldown updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.cooldown_updated"));
 				$this->openInteraction($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -721,25 +727,25 @@ final class NpcUiManager{
 		$entityType = VanillaMobCatalog::resolve($definition->getEntityType()) ?? $definition->getEntityType();
 		$isHuman = VanillaMobCatalog::isHuman($entityType);
 		if(!$isHuman && !$this->supportsActorAnimation($entityType)){
-			$player->sendMessage(TextFormat::YELLOW . "This NPC type has no supported animation controls.");
+			$player->sendMessage(TextFormat::YELLOW . $this->t("ui.no_animation_controls"));
 			$this->openEdit($player, $id);
 			return;
 		}
-		$options = [new MenuOption("Actor animation")];
+		$options = [new MenuOption($this->t("ui.actor_animation"))];
 		$actions = ["actor_animation"];
 		if($isHuman){
-			$options[] = new MenuOption("Player emotes");
+			$options[] = new MenuOption($this->t("ui.player_emotes"));
 			$actions[] = "player_emotes";
-			$options[] = new MenuOption("Random emotes");
+			$options[] = new MenuOption($this->t("ui.random_emotes"));
 			$actions[] = "random_emotes";
 		}
-		$options[] = new MenuOption("Clear active animation");
+		$options[] = new MenuOption($this->t("ui.clear_animation"));
 		$actions[] = "clear";
-		$options[] = new MenuOption("Back");
+		$options[] = new MenuOption($this->t("ui.back"));
 		$actions[] = "back";
 		$player->sendForm(new MenuForm(
-			$isHuman ? "Animation & emotes: " . $id : "Animation: " . $id,
-			$isHuman ? "Actor animations and player emotes use separate controls and triggers." : "This visual mob supports actor animations only.",
+			$isHuman ? $this->t("ui.animation_emotes_title", ["id" => $id]) : $this->t("ui.animation_title", ["id" => $id]),
+			$isHuman ? $this->t("ui.animation_emotes_description") : $this->t("ui.animation_description"),
 			$options,
 			function(Player $player, int $selected) use ($id, $actions) : void{
 				switch($actions[$selected] ?? "back"){
@@ -748,7 +754,7 @@ final class NpcUiManager{
 					case "random_emotes": $this->openRandomEmotes($player, $id); break;
 					case "clear":
 						$this->manager->setAnimation($id, "none");
-						$player->sendMessage(TextFormat::GREEN . "Active NPC animation cleared.");
+						$player->sendMessage(TextFormat::GREEN . $this->t("ui.animation_cleared"));
 						$this->openAnimation($player, $id);
 						break;
 					case "back": $this->openEdit($player, $id); break;
@@ -767,27 +773,27 @@ final class NpcUiManager{
 		$profile = VanillaMobCatalog::profile($entityType);
 		$canAnimateSound = $profile->supports("flight");
 		$actorValues = ["none"];
-		$actorLabels = ["None"];
+		$actorLabels = [$this->t("ui.none")];
 		if($profile->supports("flight")){
 			$actorValues[] = "fly";
-			$actorLabels[] = "Fly (wing/flight)";
+			$actorLabels[] = $this->t("ui.fly_animation");
 		}
-		foreach(["arm_swing" => "Arm swing", "hurt" => "Hurt", "critical_hit" => "Critical hit", "magic_critical" => "Magic critical"] as $type => $label){
+		foreach(["arm_swing" => $this->t("ui.arm_swing"), "hurt" => $this->t("ui.hurt"), "critical_hit" => $this->t("ui.critical_hit"), "magic_critical" => $this->t("ui.magic_critical")] as $type => $label){
 			$actorValues[] = $type;
 			$actorLabels[] = $label;
 		}
 		$triggerValues = ["timer", "spawn", "right_click", "left_click"];
 		$elements = [
-			new Label("info", "This screen only controls actor animations. Player emotes have their own menu and trigger settings."),
-			new Dropdown("actor", "Actor animation", $actorLabels, max(0, array_search($definition->getAnimationType(), $actorValues, true)))
+			new Label("info", $this->t("ui.actor_animation_info")),
+			new Dropdown("actor", $this->t("ui.actor_animation"), $actorLabels, max(0, array_search($definition->getAnimationType(), $actorValues, true)))
 		];
-		$elements[] = new Input("interval", "Interval in ticks", "100", (string) $definition->getAnimationInterval());
-		$elements[] = new Dropdown("trigger", "Trigger", ["Timer", "Spawn", "Right click", "Left click"], max(0, array_search($definition->getAnimationTrigger(), $triggerValues, true)));
+		$elements[] = new Input("interval", $this->t("ui.interval_ticks"), "100", (string) $definition->getAnimationInterval());
+		$elements[] = new Dropdown("trigger", $this->t("ui.trigger"), [$this->t("ui.timer"), $this->t("ui.spawn"), $this->t("ui.right_click"), $this->t("ui.left_click")], max(0, array_search($definition->getAnimationTrigger(), $triggerValues, true)));
 		if($canAnimateSound){
-			$elements[] = new Toggle("animation_sound", "Play nearby ambient sound while flying", $definition->isAnimationSoundEnabled());
+			$elements[] = new Toggle("animation_sound", $this->t("ui.animation_sound"), $definition->isAnimationSoundEnabled());
 		}
 		$player->sendForm(new CustomForm(
-			"Actor animation: " . $id,
+			$this->t("ui.actor_animation_title", ["id" => $id]),
 			$elements,
 			function(Player $player, CustomFormResponse $response) use ($id, $actorValues, $triggerValues, $canAnimateSound) : void{
 				$interval = is_numeric($response->getString("interval")) ? max(1, (int) $response->getString("interval")) : 100;
@@ -796,7 +802,7 @@ final class NpcUiManager{
 				if($canAnimateSound){
 					$this->manager->setBoolean($id, "animation_sound", $response->getBool("animation_sound"));
 				}
-				$player->sendMessage(TextFormat::GREEN . "Actor animation updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.actor_animation_updated"));
 				$this->openAnimation($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -809,24 +815,24 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Random emotes: " . $id,
+			$this->t("ui.random_emotes_title", ["id" => $id]),
 			[
-				new Label("info", "This is independent from the main animation. It is disabled by default."),
-				new Toggle("enabled", "Enable random emotes", $definition->isRandomEmoteEnabled()),
-				new Input("pool", "Emote names/UUIDs, comma separated", "wave, simple clap", implode(", ", $definition->getEmotePool())),
-				new Input("cooldown", "Cooldown seconds", "60", (string) $definition->getRandomEmoteCooldown())
+				new Label("info", $this->t("ui.random_emotes_info")),
+				new Toggle("enabled", $this->t("ui.enable_random_emotes"), $definition->isRandomEmoteEnabled()),
+				new Input("pool", $this->t("ui.emote_pool"), "wave, simple clap", implode(", ", $definition->getEmotePool())),
+				new Input("cooldown", $this->t("ui.cooldown_seconds"), "60", (string) $definition->getRandomEmoteCooldown())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$pool = array_values(array_filter(array_map("trim", explode(",", $response->getString("pool"))), static fn(string $value) : bool => $value !== ""));
 				foreach($pool as $emote){
 					if(EmoteCatalog::resolve($emote) === null){
-						$player->sendMessage(TextFormat::RED . "Unknown emote in pool: " . $emote);
+						$player->sendMessage(TextFormat::RED . $this->t("ui.unknown_emote_pool", ["emote" => $emote]));
 						return;
 					}
 				}
 				$cooldown = is_numeric($response->getString("cooldown")) ? max(0.0, (float) $response->getString("cooldown")) : 60.0;
 				$this->manager->setEmotePool($id, $pool, $response->getBool("enabled"), $cooldown);
-				$player->sendMessage(TextFormat::GREEN . "Random emote settings updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.random_emotes_updated"));
 				$this->openAnimation($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -835,12 +841,12 @@ final class NpcUiManager{
 
 	private function openEffects(Player $player, string $id) : void{
 		$player->sendForm(new MenuForm(
-			"Sound & particles: " . $id,
-			"Sound and particle settings are independent. Choose one category.",
+			$this->t("ui.sound_particles_title", ["id" => $id]),
+			$this->t("ui.sound_particles_description"),
 			[
-				new MenuOption("Sound"),
-				new MenuOption("Particles"),
-				new MenuOption("Back")
+				new MenuOption($this->t("ui.sound")),
+				new MenuOption($this->t("ui.particles")),
+				new MenuOption($this->t("ui.back"))
 			],
 			function(Player $player, int $selected) use ($id) : void{
 				switch($selected){
@@ -859,12 +865,12 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new MenuForm(
-			"Sound: " . $id,
-			"Choose whether interaction sounds are enabled or select a vanilla sound event.",
+			$this->t("ui.sound_title", ["id" => $id]),
+			$this->t("ui.sound_description"),
 			[
-				new MenuOption("Enabled: " . ($definition->isSoundEnabled() ? "On" : "Off")),
-				new MenuOption("Sound type: " . $definition->getSoundType()),
-				new MenuOption("Back")
+				new MenuOption($this->t("ui.enabled", ["value" => $definition->isSoundEnabled() ? $this->t("ui.on") : $this->t("ui.off")])),
+				new MenuOption($this->t("ui.sound_type", ["value" => $definition->getSoundType()])),
+				new MenuOption($this->t("ui.back"))
 			],
 			function(Player $player, int $selected) use ($id) : void{
 				switch($selected){
@@ -883,8 +889,8 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Sound enabled: " . $id,
-			[new Toggle("enabled", "Play interaction sound", $definition->isSoundEnabled())],
+			$this->t("ui.sound_enabled_title", ["id" => $id]),
+			[new Toggle("enabled", $this->t("ui.play_interaction_sound"), $definition->isSoundEnabled())],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$this->manager->setBoolean($id, "sound", $response->getBool("enabled"));
 				$this->openSoundSettings($player, $id);
@@ -911,10 +917,10 @@ final class NpcUiManager{
 		$pageCount = max(1, (int) ceil(count($types) / $pageSize));
 		$page = min(max(0, $page), $pageCount - 1);
 		$pageTypes = array_slice($types, $page * $pageSize, $pageSize);
-		$options = [new MenuOption("Back"), new MenuOption("Search sounds")];
+		$options = [new MenuOption($this->t("ui.back")), new MenuOption($this->t("ui.search_sounds"))];
 		$actions = ["back", "search"];
 		if($page > 0){
-			$options[] = new MenuOption("Previous page");
+			$options[] = new MenuOption($this->t("ui.previous_page"));
 			$actions[] = "previous";
 		}
 		foreach($pageTypes as $type){
@@ -922,12 +928,12 @@ final class NpcUiManager{
 			$actions[] = "sound:" . $type;
 		}
 		if($page + 1 < $pageCount){
-			$options[] = new MenuOption("Next page");
+			$options[] = new MenuOption($this->t("ui.next_page"));
 			$actions[] = "next";
 		}
 		$player->sendForm(new MenuForm(
-			"Sound types: " . $id,
-			"Showing page " . ($page + 1) . "/" . $pageCount . ($normalizedQuery === "" ? "" : "\nSearch: " . $query),
+			$this->t("ui.sound_types_title", ["id" => $id]),
+			$this->t("ui.page_description", ["page" => $page + 1, "pages" => $pageCount, "search" => $normalizedQuery === "" ? "" : "\n" . $this->t("ui.search_value", ["query" => $query])]),
 			$options,
 			function(Player $player, int $selected) use ($id, $actions, $query, $page) : void{
 				$action = $actions[$selected] ?? "back";
@@ -940,7 +946,7 @@ final class NpcUiManager{
 				if(str_starts_with($action, "sound:")){
 					$type = substr($action, 6);
 					$this->manager->setEffectType($id, "sound", $type);
-					$player->sendMessage(TextFormat::GREEN . "Sound type updated to " . $type . ".");
+					$player->sendMessage(TextFormat::GREEN . $this->t("ui.sound_updated", ["type" => $type]));
 					$this->openSoundSettings($player, $id);
 				}
 			},
@@ -950,8 +956,8 @@ final class NpcUiManager{
 
 	private function openSoundSearch(Player $player, string $id, string $initialQuery = "") : void{
 		$player->sendForm(new CustomForm(
-			"Search sound types: " . $id,
-			[new Input("query", "Search sound", "ambient, hurt, flap", $initialQuery)],
+			$this->t("ui.search_sound_title", ["id" => $id]),
+			[new Input("query", $this->t("ui.search_sound"), "ambient, hurt, flap", $initialQuery)],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$this->openSoundBrowser($player, $id, trim($response->getString("query")));
 			},
@@ -965,13 +971,13 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new MenuForm(
-			"Particles: " . $id,
-			"Choose whether particles are enabled, select a vanilla particle, or edit burst size.",
+			$this->t("ui.particles_title", ["id" => $id]),
+			$this->t("ui.particles_description"),
 			[
-				new MenuOption("Enabled: " . ($definition->isParticleEnabled() ? "On" : "Off")),
-				new MenuOption("Particle type: " . VanillaParticleCatalog::displayName($definition->getParticleType())),
-				new MenuOption("Burst settings"),
-				new MenuOption("Back")
+				new MenuOption($this->t("ui.enabled", ["value" => $definition->isParticleEnabled() ? $this->t("ui.on") : $this->t("ui.off")])),
+				new MenuOption($this->t("ui.particle_type", ["value" => VanillaParticleCatalog::displayName($definition->getParticleType())])),
+				new MenuOption($this->t("ui.burst_settings")),
+				new MenuOption($this->t("ui.back"))
 			],
 			function(Player $player, int $selected) use ($id) : void{
 				switch($selected){
@@ -991,8 +997,8 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Particles enabled: " . $id,
-			[new Toggle("enabled", "Show particles", $definition->isParticleEnabled())],
+			$this->t("ui.particles_enabled_title", ["id" => $id]),
+			[new Toggle("enabled", $this->t("ui.show_particles"), $definition->isParticleEnabled())],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$this->manager->setBoolean($id, "particle", $response->getBool("enabled"));
 				$this->openParticleSettings($player, $id);
@@ -1007,10 +1013,10 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Particle burst: " . $id,
+			$this->t("ui.particle_burst_title", ["id" => $id]),
 			[
-				new Input("count", "Particles per burst", "8", (string) $definition->getParticleCount()),
-				new Input("spread", "Particle spread", "0.35", (string) $definition->getParticleSpread())
+				new Input("count", $this->t("ui.particles_per_burst"), "8", (string) $definition->getParticleCount()),
+				new Input("spread", $this->t("ui.particle_spread"), "0.35", (string) $definition->getParticleSpread())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$count = is_numeric($response->getString("count")) ? (int) $response->getString("count") : 8;
@@ -1032,10 +1038,10 @@ final class NpcUiManager{
 		$pageCount = max(1, (int) ceil(count($types) / $pageSize));
 		$page = min(max(0, $page), $pageCount - 1);
 		$pageTypes = array_slice($types, $page * $pageSize, $pageSize);
-		$options = [new MenuOption("Back"), new MenuOption("Search particles")];
+		$options = [new MenuOption($this->t("ui.back")), new MenuOption($this->t("ui.search_particles"))];
 		$actions = ["back", "search"];
 		if($page > 0){
-			$options[] = new MenuOption("Previous page");
+			$options[] = new MenuOption($this->t("ui.previous_page"));
 			$actions[] = "previous";
 		}
 		foreach($pageTypes as $type){
@@ -1043,12 +1049,12 @@ final class NpcUiManager{
 			$actions[] = "particle:" . $type;
 		}
 		if($page + 1 < $pageCount){
-			$options[] = new MenuOption("Next page");
+			$options[] = new MenuOption($this->t("ui.next_page"));
 			$actions[] = "next";
 		}
 		$player->sendForm(new MenuForm(
-			"Particle types: " . $id,
-			"Showing page " . ($page + 1) . "/" . $pageCount . ($normalizedQuery === "" ? "" : "\nSearch: " . $query),
+			$this->t("ui.particle_types_title", ["id" => $id]),
+			$this->t("ui.page_description", ["page" => $page + 1, "pages" => $pageCount, "search" => $normalizedQuery === "" ? "" : "\n" . $this->t("ui.search_value", ["query" => $query])]),
 			$options,
 			function(Player $player, int $selected) use ($id, $actions, $query, $page) : void{
 				$action = $actions[$selected] ?? "back";
@@ -1061,7 +1067,7 @@ final class NpcUiManager{
 				if(str_starts_with($action, "particle:")){
 					$type = substr($action, 9);
 					$this->manager->setEffectType($id, "particle", $type);
-					$player->sendMessage(TextFormat::GREEN . "Particle type updated to " . VanillaParticleCatalog::displayName($type) . ".");
+					$player->sendMessage(TextFormat::GREEN . $this->t("ui.particle_updated", ["type" => VanillaParticleCatalog::displayName($type)]));
 					$this->openParticleSettings($player, $id);
 				}
 			},
@@ -1071,8 +1077,8 @@ final class NpcUiManager{
 
 	private function openParticleSearch(Player $player, string $id, string $initialQuery = "") : void{
 		$player->sendForm(new CustomForm(
-			"Search particle types: " . $id,
-			[new Input("query", "Search particle", "flame, enchant, smoke", $initialQuery)],
+			$this->t("ui.search_particle_title", ["id" => $id]),
+			[new Input("query", $this->t("ui.search_particle"), "flame, enchant, smoke", $initialQuery)],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$this->openParticleBrowser($player, $id, trim($response->getString("query")));
 			},
@@ -1086,17 +1092,17 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Look at nearby players: " . $id,
+			$this->t("ui.look_at_title", ["id" => $id]),
 			[
-				new Toggle("rotate", "Look at nearby players", $definition->isRotateEnabled()),
-				new Input("rotation_distance", "Look-at distance (blocks)", "64", (string) $definition->getRotationDistance())
+				new Toggle("rotate", $this->t("ui.look_at_nearby_players"), $definition->isRotateEnabled()),
+				new Input("rotation_distance", $this->t("ui.look_at_distance"), "64", (string) $definition->getRotationDistance())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$this->manager->setBoolean($id, "rotate", $response->getBool("rotate"));
 				if(is_numeric($response->getString("rotation_distance"))){
 					$this->manager->setRotationDistance($id, max(0.0, (float) $response->getString("rotation_distance")));
 				}
-				$player->sendMessage(TextFormat::GREEN . "Look-at settings updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.look_at_updated"));
 				$this->openEdit($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -1109,22 +1115,22 @@ final class NpcUiManager{
 			return;
 		}
 		$modeLabels = [
-			"none" => "Disabled",
-			"server" => "This server",
-			"world" => "This world",
-			"query" => "BedrockQuery host"
+			"none" => $this->t("ui.disabled"),
+			"server" => $this->t("ui.this_server"),
+			"world" => $this->t("ui.this_world"),
+			"query" => $this->t("ui.bedrock_query_host")
 		];
 		$options = [];
 		$actions = [];
 		foreach($modeLabels as $mode => $label){
-			$options[] = new MenuOption($label . ($definition->getPlayerCountMode() === $mode ? " (current)" : ""));
+			$options[] = new MenuOption($label . ($definition->getPlayerCountMode() === $mode ? " (" . $this->t("ui.current") . ")" : ""));
 			$actions[] = $mode;
 		}
-		$options[] = new MenuOption("Back");
+		$options[] = new MenuOption($this->t("ui.back"));
 		$actions[] = "back";
 		$player->sendForm(new MenuForm(
-			"Player count: " . $id,
-			"Choose one mode. World and query modes open their own target form.",
+			$this->t("ui.player_count_title", ["id" => $id]),
+			$this->t("ui.player_count_description"),
 			$options,
 			function(Player $player, int $selected) use ($id, $actions) : void{
 				$action = $actions[$selected] ?? "back";
@@ -1132,7 +1138,7 @@ final class NpcUiManager{
 					case "none":
 					case "server":
 						$this->manager->setPlayerCount($id, $action);
-						$player->sendMessage(TextFormat::GREEN . "Player count mode updated.");
+						$player->sendMessage(TextFormat::GREEN . $this->t("ui.player_count_updated"));
 						$this->openPlayerCount($player, $id);
 						break;
 					case "world": $this->openPlayerCountWorld($player, $id); break;
@@ -1150,19 +1156,19 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Player count world: " . $id,
+			$this->t("ui.player_count_world_title", ["id" => $id]),
 			[
-				new Label("info", "Count players in one loaded world."),
-				new Input("world", "World name", "world", $definition->getPlayerCountWorld())
+				new Label("info", $this->t("ui.player_count_world_info")),
+				new Input("world", $this->t("ui.world_name"), "world", $definition->getPlayerCountWorld())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id, $definition) : void{
 				$world = trim($response->getString("world"));
 				if($world === ""){
-					$player->sendMessage(TextFormat::RED . "Enter a world name.");
+					$player->sendMessage(TextFormat::RED . $this->t("ui.world_required"));
 					return;
 				}
 				$this->manager->setPlayerCount($id, "world", $world, "", $definition->getQueryPort(), $definition->getQueryInterval());
-				$player->sendMessage(TextFormat::GREEN . "Player count world updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.player_count_world_updated"));
 				$this->openPlayerCount($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -1175,21 +1181,21 @@ final class NpcUiManager{
 			return;
 		}
 		$player->sendForm(new CustomForm(
-			"Player count query: " . $id,
+			$this->t("ui.player_count_query_title", ["id" => $id]),
 			[
-				new Label("info", "Query a Bedrock server using its host and port."),
-				new Input("host", "Query host", "127.0.0.1", $definition->getQueryHost()),
-				new Input("port", "Query port", "19132", (string) $definition->getQueryPort())
+				new Label("info", $this->t("ui.player_count_query_info")),
+				new Input("host", $this->t("ui.query_host"), "127.0.0.1", $definition->getQueryHost()),
+				new Input("port", $this->t("ui.query_port"), "19132", (string) $definition->getQueryPort())
 			],
 			function(Player $player, CustomFormResponse $response) use ($id, $definition) : void{
 				$host = trim($response->getString("host"));
 				$port = is_numeric($response->getString("port")) ? max(1, (int) $response->getString("port")) : 19132;
 				if($host === ""){
-					$player->sendMessage(TextFormat::RED . "Enter a query host.");
+					$player->sendMessage(TextFormat::RED . $this->t("ui.query_host_required"));
 					return;
 				}
 				$this->manager->setPlayerCount($id, "query", "", $host, $port, $definition->getQueryInterval());
-				$player->sendMessage(TextFormat::GREEN . "Player count query target updated.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.player_count_query_updated"));
 				$this->openPlayerCount($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -1198,25 +1204,25 @@ final class NpcUiManager{
 
 	private function openLocation(Player $player, string $id) : void{
 		$player->sendForm(new MenuForm(
-			"Location: " . $id,
-			"Move the NPC to your position, or teleport yourself to it.",
+			$this->t("ui.location_title", ["id" => $id]),
+			$this->t("ui.location_description"),
 			[
-				new MenuOption("Move NPC here"),
-				new MenuOption("Teleport to NPC"),
-				new MenuOption("Back")
+				new MenuOption($this->t("ui.move_npc_here")),
+				new MenuOption($this->t("ui.teleport_to_npc")),
+				new MenuOption($this->t("ui.back"))
 			],
 			function(Player $player, int $selected) use ($id) : void{
 				switch($selected){
 					case 0:
 						if($this->manager->move($player, $id)){
-							$player->sendMessage(TextFormat::GREEN . "NPC moved to your position.");
+							$player->sendMessage(TextFormat::GREEN . $this->t("ui.npc_moved"));
 						}else{
-							$player->sendMessage(TextFormat::RED . "NPC not found.");
+							$player->sendMessage(TextFormat::RED . $this->t("cmd.not_found"));
 						}
 						$this->openLocation($player, $id);
 						break;
 					case 1:
-						$player->sendMessage($this->manager->teleport($player, $id) ? TextFormat::GREEN . "Teleported to NPC." : TextFormat::RED . "NPC is not spawned.");
+						$player->sendMessage($this->manager->teleport($player, $id) ? TextFormat::GREEN . $this->t("ui.teleported_to_npc") : TextFormat::RED . $this->t("cmd.not_spawned"));
 						$this->openLocation($player, $id);
 						break;
 					case 2: $this->openEdit($player, $id); break;
@@ -1227,13 +1233,13 @@ final class NpcUiManager{
 	}
 
 	private function openEmoteSearch(Player $player, ?string $npcId = null) : void{
-		$title = $npcId === null ? "Player emotes" : "Choose emote: " . $npcId;
+		$title = $npcId === null ? $this->t("ui.player_emotes") : $this->t("ui.choose_emote", ["id" => $npcId]);
 		$player->sendForm(new CustomForm(
 			$title,
 			[
-				new Label("info", "Each result has its official Bedrock thumbnail. Select one to configure it for the NPC."),
-				new Input("query", "Search title", "air guitar or wave", ""),
-				new Input("page", "Page", "1", "1")
+				new Label("info", $this->t("ui.emote_search_info")),
+				new Input("query", $this->t("ui.search_title"), "air guitar or wave", ""),
+				new Input("page", $this->t("ui.page"), "1", "1")
 			],
 			function(Player $player, CustomFormResponse $response) use ($npcId) : void{
 				$query = trim($response->getString("query"));
@@ -1256,10 +1262,10 @@ final class NpcUiManager{
 			return;
 		}
 
-		$options = [new MenuOption("Search emotes")];
+		$options = [new MenuOption($this->t("ui.search_emotes"))];
 		$actions = ["search"];
 		if($page > 0){
-			$options[] = new MenuOption("Previous page");
+			$options[] = new MenuOption($this->t("ui.previous_page"));
 			$actions[] = "previous";
 		}
 		foreach($matches as $index => $entry){
@@ -1271,16 +1277,16 @@ final class NpcUiManager{
 			$actions[] = "emote:" . $index;
 		}
 		if($hasNext){
-			$options[] = new MenuOption("Next page");
+			$options[] = new MenuOption($this->t("ui.next_page"));
 			$actions[] = "next";
 		}
 
 		$first = $page * $pageSize + 1;
 		$last = $first + count($matches) - 1;
-		$target = $npcId === null ? "" : " for " . $npcId;
+		$target = $npcId === null ? "" : $this->t("ui.for_id", ["id" => $npcId]);
 		$player->sendForm(new MenuForm(
-			"Emotes " . ($page + 1) . $target,
-			"Showing " . (count($matches) === 0 ? "0" : $first . "-" . $last) . " of " . EmoteCatalog::count() . ($query === "" ? "" : "\nSearch: " . $query),
+			$this->t("ui.emotes_title", ["page" => $page + 1, "target" => $target]),
+			$this->t("ui.emotes_description", ["first" => count($matches) === 0 ? "0" : $first, "last" => $last, "count" => EmoteCatalog::count(), "search" => $query === "" ? "" : "\n" . $this->t("ui.search_value", ["query" => $query])]),
 			$options,
 			function(Player $player, int $selected) use ($actions, $npcId, $query, $page, $matches) : void{
 				$action = $actions[$selected] ?? "";
@@ -1314,21 +1320,21 @@ final class NpcUiManager{
 
 	private function openEmoteConfigure(Player $player, string $npcId, string $title, string $uuid) : void{
 		$player->sendForm(new CustomForm(
-			"Apply emote: " . $title,
+			$this->t("ui.apply_emote_title", ["title" => $title]),
 			[
-				new Label("info", "UUID: " . $uuid . "\nThe thumbnail was shown in the previous menu."),
-				new Input("interval", "Interval in ticks", "100", "100"),
-				new Dropdown("trigger", "Trigger", ["Timer", "Spawn", "Right click", "Left click"])
+				new Label("info", $this->t("ui.emote_uuid_info", ["uuid" => $uuid])),
+				new Input("interval", $this->t("ui.interval_ticks"), "100", "100"),
+				new Dropdown("trigger", $this->t("ui.trigger"), [$this->t("ui.timer"), $this->t("ui.spawn"), $this->t("ui.right_click"), $this->t("ui.left_click")])
 			],
 			function(Player $player, CustomFormResponse $response) use ($npcId, $uuid) : void{
 				$triggers = ["timer", "spawn", "right_click", "left_click"];
 				$interval = is_numeric($response->getString("interval")) ? max(1, (int) $response->getString("interval")) : 100;
 				$trigger = $triggers[$response->getInt("trigger")] ?? "timer";
 				if($this->manager->setAnimation($npcId, "emote", $uuid, $interval, $trigger)){
-					$player->sendMessage(TextFormat::GREEN . "NPC player emote updated.");
+					$player->sendMessage(TextFormat::GREEN . $this->t("cmd.emote_updated"));
 					$this->openAnimation($player, $npcId);
 				}else{
-					$player->sendMessage(TextFormat::RED . "NPC not found or emote is invalid.");
+					$player->sendMessage(TextFormat::RED . $this->t("cmd.emote_invalid"));
 				}
 			},
 			static function(Player $player) : void{}
@@ -1350,13 +1356,13 @@ final class NpcUiManager{
 			"right_click" => "Right-click actions",
 			default => "Shared actions"
 		};
-		$options = [new MenuOption("Add action"), new MenuOption("Back")];
+		$options = [new MenuOption($this->t("ui.add_action")), new MenuOption($this->t("ui.back"))];
 		foreach($commands as $command){
-			$options[] = new MenuOption("Remove: " . substr($command, 0, 45));
+			$options[] = new MenuOption($this->t("ui.remove_action", ["command" => substr($command, 0, 45)]));
 		}
 		$player->sendForm(new MenuForm(
-			$label . ": " . $id,
-			$trigger === "shared" ? "Runs for both clicks. Prefix console: for server actions." : "Runs only for this click when interaction mode is separate.",
+			$this->t("ui.action_list_title", ["label" => $label, "id" => $id]),
+			$trigger === "shared" ? $this->t("ui.shared_actions_info") : $this->t("ui.separate_actions_info"),
 			$options,
 			function(Player $player, int $selected) use ($id, $trigger, $commands) : void{
 				if($selected === 0){
@@ -1381,13 +1387,13 @@ final class NpcUiManager{
 			default => "shared"
 		};
 		$player->sendForm(new CustomForm(
-			"Add $label action: " . $id,
-			[new Input("command", "Command", "say hello", "")],
+			$this->t("ui.add_action_title", ["label" => $label, "id" => $id]),
+			[new Input("command", $this->t("ui.command"), "say hello", "")],
 			function(Player $player, CustomFormResponse $response) use ($id, $trigger) : void{
 				$command = trim($response->getString("command"));
 				$definition = $this->manager->getDefinition($id);
 				if($command === "" || $definition === null){
-					$player->sendMessage(TextFormat::RED . "Command cannot be empty.");
+					$player->sendMessage(TextFormat::RED . $this->t("ui.command_empty"));
 					return;
 				}
 				if($trigger === "shared"){
@@ -1396,7 +1402,7 @@ final class NpcUiManager{
 					$commands = $trigger === "left_click" ? $definition->getHitCommands() : $definition->getInteractCommands();
 					$this->manager->setTriggerCommands($id, $trigger, array_merge($commands, [$command]));
 				}
-				$player->sendMessage(TextFormat::GREEN . "Action added.");
+				$player->sendMessage(TextFormat::GREEN . $this->t("ui.action_added"));
 				$this->openActionList($player, $id, $trigger);
 			},
 			static function(Player $player) : void{}
@@ -1405,8 +1411,8 @@ final class NpcUiManager{
 
 	private function playerConfirmRemoveAction(Player $player, string $id, string $trigger, string $command) : void{
 		$player->sendForm(new ModalForm(
-			"Remove action",
-			"Remove this action?\n" . $command,
+			$this->t("ui.remove_action_title"),
+			$this->t("ui.remove_action_description", ["command" => $command]),
 			function(Player $player, bool $choice) use ($id, $trigger, $command) : void{
 				if($choice){
 					$definition = $this->manager->getDefinition($id);
@@ -1419,12 +1425,12 @@ final class NpcUiManager{
 							$this->manager->setTriggerCommands($id, $trigger, $commands);
 						}
 					}
-					$player->sendMessage(TextFormat::GREEN . "Action removed.");
+					$player->sendMessage(TextFormat::GREEN . $this->t("ui.action_removed"));
 				}
 				$this->openActionList($player, $id, $trigger);
 			},
-			"Remove",
-			"Cancel",
+			$this->t("ui.remove"),
+			$this->t("ui.cancel"),
 			static function(Player $player) : void{}
 		));
 	}
@@ -1436,16 +1442,16 @@ final class NpcUiManager{
 		}
 		$equipment = $definition->getEquipment();
 		$player->sendForm(new CustomForm(
-			"Equipment: " . $id,
+			$this->t("ui.equipment_title", ["id" => $id]),
 			[
-				new Label("info", "Toggle slots to copy the matching item from your current player loadout."),
-				new Toggle("sync_all", "Copy all equipment from me", false),
-				new Toggle("hand", "Main hand" . $this->equipmentSummary($equipment, "hand"), false),
-				new Toggle("offhand", "Off-hand" . $this->equipmentSummary($equipment, "offhand"), false),
-				new Toggle("helmet", "Helmet" . $this->equipmentSummary($equipment, "helmet"), false),
-				new Toggle("chestplate", "Chestplate" . $this->equipmentSummary($equipment, "chestplate"), false),
-				new Toggle("leggings", "Leggings" . $this->equipmentSummary($equipment, "leggings"), false),
-				new Toggle("boots", "Boots" . $this->equipmentSummary($equipment, "boots"), false)
+				new Label("info", $this->t("ui.equipment_info")),
+				new Toggle("sync_all", $this->t("ui.copy_all_equipment"), false),
+				new Toggle("hand", $this->t("ui.main_hand") . $this->equipmentSummary($equipment, "hand"), false),
+				new Toggle("offhand", $this->t("ui.off_hand") . $this->equipmentSummary($equipment, "offhand"), false),
+				new Toggle("helmet", $this->t("ui.helmet") . $this->equipmentSummary($equipment, "helmet"), false),
+				new Toggle("chestplate", $this->t("ui.chestplate") . $this->equipmentSummary($equipment, "chestplate"), false),
+				new Toggle("leggings", $this->t("ui.leggings") . $this->equipmentSummary($equipment, "leggings"), false),
+				new Toggle("boots", $this->t("ui.boots") . $this->equipmentSummary($equipment, "boots"), false)
 			],
 			function(Player $player, CustomFormResponse $response) use ($id) : void{
 				$slots = null;
@@ -1458,12 +1464,12 @@ final class NpcUiManager{
 					}
 				}
 				if($slots === []){
-					$player->sendMessage(TextFormat::YELLOW . "No equipment slot was selected. Nothing changed.");
+					$player->sendMessage(TextFormat::YELLOW . $this->t("ui.no_equipment_slot"));
 					$this->openAppearance($player, $id);
 					return;
 				}
 				$ok = $this->manager->setEquipmentFromPlayer($player, $id, $slots);
-				$player->sendMessage($ok ? TextFormat::GREEN . "Equipment copied from your current loadout." : TextFormat::RED . "Equipment could not be updated.");
+				$player->sendMessage($ok ? TextFormat::GREEN . $this->t("ui.equipment_copied") : TextFormat::RED . $this->t("ui.equipment_update_failed"));
 				$this->openAppearance($player, $id);
 			},
 			static function(Player $player) : void{}
@@ -1477,21 +1483,21 @@ final class NpcUiManager{
 
 	private function openDelete(Player $player, string $id) : void{
 		$player->sendForm(new ModalForm(
-			"Delete NPC",
-			"Delete NPC '$id'? This cannot be undone from the form.",
+			$this->t("ui.delete_title"),
+			$this->t("ui.delete_description", ["id" => $id]),
 			function(Player $player, bool $choice) use ($id) : void{
 				if($choice){
 					if($this->manager->remove($id)){
-						$player->sendMessage(TextFormat::GREEN . "NPC '$id' removed.");
+						$player->sendMessage(TextFormat::GREEN . $this->t("ui.deleted", ["id" => $id]));
 					}else{
-						$player->sendMessage(TextFormat::RED . "NPC '$id' no longer exists.");
+						$player->sendMessage(TextFormat::RED . $this->t("ui.delete_missing", ["id" => $id]));
 					}
 					return;
 				}
 				$this->openEdit($player, $id);
 			},
-			"Delete",
-			"Cancel",
+			$this->t("ui.delete"),
+			$this->t("ui.cancel"),
 			static function(Player $player) : void{}
 		));
 	}
