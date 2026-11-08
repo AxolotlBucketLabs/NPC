@@ -32,7 +32,8 @@ final class Translator{
 			$plugin->saveResource("lang/messages-" . $language . ".yml");
 		}
 
-		$configLanguage = strtolower((string) $plugin->getConfig()->getNested("settings.language", "eng"));
+		$configLanguageValue = $plugin->getConfig()->getNested("settings.language", "eng");
+		$configLanguage = is_string($configLanguageValue) ? strtolower($configLanguageValue) : "eng";
 		$this->language = in_array($configLanguage, self::SUPPORTED_LANGUAGES, true) ? $configLanguage : "eng";
 		$this->englishMessages = $this->load($plugin, "eng");
 		$this->messages = $this->language === "eng" ? $this->englishMessages : array_replace($this->englishMessages, $this->load($plugin, $this->language));
