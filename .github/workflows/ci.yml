@@ -57,7 +57,7 @@ jobs:
 
       - name: Build and analyze PHAR with DevTools
         id: build
-        uses: AxolotlBucketLabs/DevTools@0fd73cc2c82d03d0d47f6c7ce119859deda042e3 # v3.3.0
+        uses: AxolotlBucketLabs/DevTools@v4.0.0 # v4.0.0
         with:
           project: .
           prepare-dependencies: true
