@@ -15,11 +15,18 @@ foreach($argv as $argument){
 /**
  * @throws RuntimeException
  */
-function fetchJson(string $url) : string{
+function fetchJson(string $url, ?string $authorizationToken = null) : string{
+	$headers = [
+		"Accept: application/vnd.github+json",
+		"User-Agent: Axolotl-NPC-emote-catalog"
+	];
+	if($authorizationToken !== null){
+		$headers[] = "Authorization: Bearer " . $authorizationToken;
+	}
 	$context = stream_context_create([
 		"http" => [
 			"method" => "GET",
-			"header" => "Accept: application/vnd.github+json\r\nUser-Agent: Axolotl-NPC-emote-catalog\r\n",
+			"header" => implode("\r\n", $headers) . "\r\n",
 			"timeout" => 30
 		],
 		"ssl" => [
@@ -35,7 +42,8 @@ function fetchJson(string $url) : string{
 }
 
 try{
-	$metadata = json_decode(fetchJson(SOURCE_API_URL), true, 512, JSON_THROW_ON_ERROR);
+	$authorizationToken = getenv("GH_TOKEN") ?: null;
+	$metadata = json_decode(fetchJson(SOURCE_API_URL, $authorizationToken), true, 512, JSON_THROW_ON_ERROR);
 	if(!is_array($metadata) || !is_string($metadata["sha"] ?? null) || !is_string($metadata["download_url"] ?? null)){
 		throw new RuntimeException("The upstream metadata response is missing its source revision");
 	}
