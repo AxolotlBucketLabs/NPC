@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    uses: AxolotlBucketLabs/DevTools/.github/workflows/release-plugin.yml@v4.1.1 # v4.1.1
+    uses: AxolotlBucketLabs/DevTools/.github/workflows/release-plugin.yml@v4.1.2 # v4.1.2
     with:
       mode: tag
       prepare-dependencies: true

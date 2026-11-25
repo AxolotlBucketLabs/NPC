@@ -18,7 +18,7 @@ All notable changes to NPC are documented here.
 
 - Source the bundled player-emote titles, UUIDs, and thumbnails from AxolotlBucketLabs/BedrockCatalog.
 - Move the maintained plugin namespace and project identity to `AxolotlBucketLabs`.
-- Use AxolotlBucketLabs DevTools `v4.1.1` for CI and release packaging.
+- Use AxolotlBucketLabs DevTools `v4.1.2` for CI and release packaging.
 - Resolve PMForms `2.3.1` from the AxolotlBucketLabs repository.
 - Keep Human, mob, block, boat, minecart, and TNT NPCs as visual actors without mob AI or pathfinding.
 

@@ -17,7 +17,7 @@ NPC actors are visual actors. They do not have mob AI, pathfinding, combat, drop
 | PureChat, PurePerms, ScoreHud | Optional runtime integrations |
 | Economy plugin | Optional. The built-in adapters check SimpleEconomy, EcoAPI, TownCoins, and TownEconomy |
 
-Development is pinned to `axolotl-pm/pocketmine-mp ~5.51.1` and PMForms `2.3.1` in `composer.lock`. CI uses AxolotlBucketLabs DevTools `v4.1.1`. The plugin manifest declares API `5.0.0`. The repository does not claim that every Axolotl-PM development revision is compatible without testing that revision.
+Development is pinned to `axolotl-pm/pocketmine-mp ~5.51.1` and PMForms `2.3.1` in `composer.lock`. CI uses AxolotlBucketLabs DevTools `v4.1.2`. The plugin manifest declares API `5.0.0`. The repository does not claim that every Axolotl-PM development revision is compatible without testing that revision.
 
 ## Installation
 
