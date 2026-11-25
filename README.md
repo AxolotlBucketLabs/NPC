@@ -1,6 +1,6 @@
 # NPC
 
-[![CI](https://github.com/AxolotlBucketLabs/NPC/actions/workflows/ci.yml/badge.svg)](https://github.com/AxolotlBucketLabs/NPC/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/AxolotlBucketLabs/NPC)](https://github.com/AxolotlBucketLabs/NPC/blob/main/LICENSE) [![Discord](https://img.shields.io/discord/1568295845374206052?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/Pk4FrNvHnM)
+[![CI](https://github.com/AxolotlBucketLabs/NPC/actions/workflows/ci.yml/badge.svg)](https://github.com/AxolotlBucketLabs/NPC/actions/workflows/ci.yml) [![Latest release](https://img.shields.io/github/v/release/AxolotlBucketLabs/NPC)](https://github.com/AxolotlBucketLabs/NPC/releases/latest) [![License](https://img.shields.io/github/license/AxolotlBucketLabs/NPC)](https://github.com/AxolotlBucketLabs/NPC/blob/main/LICENSE) [![Discord](https://img.shields.io/discord/1568295845374206052?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/Pk4FrNvHnM)
 
 NPC is an operator-focused visual NPC plugin for Axolotl-PM API 5. It stores definitions in `plugin_data/NPC/npcs.yml` and renders stationary Human, Vanilla actor, block, boat, minecart, and TNT NPCs to Bedrock clients.
 
@@ -17,7 +17,7 @@ NPC actors are visual actors. They do not have mob AI, pathfinding, combat, drop
 | PureChat, PurePerms, ScoreHud | Optional runtime integrations |
 | Economy plugin | Optional. The built-in adapters check SimpleEconomy, EcoAPI, TownCoins, and TownEconomy |
 
-Development is pinned to `axolotl-pm/pocketmine-mp ~5.51.1` and PMForms `2.3.1` in `composer.lock`. CI uses AxolotlBucketLabs DevTools `v4.0.0`. The plugin manifest declares API `5.0.0`. The repository does not claim that every Axolotl-PM development revision is compatible without testing that revision.
+Development is pinned to `axolotl-pm/pocketmine-mp ~5.51.1` and PMForms `2.3.1` in `composer.lock`. CI uses AxolotlBucketLabs DevTools `v4.1.1`. The plugin manifest declares API `5.0.0`. The repository does not claim that every Axolotl-PM development revision is compatible without testing that revision.
 
 ## Installation
 
