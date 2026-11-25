@@ -128,9 +128,9 @@ jobs:
           cat > "$body_file" <<EOF
           <!-- axolotl-npc-catalog-sync: emotes -->
 
-          This PR refreshes the bundled emote title and UUID snapshot from [Bedrock-Emotes](https://github.com/TwistedAsylumMC/Bedrock-Emotes).
+          This PR refreshes the bundled emote title, UUID, and thumbnail snapshot from [BedrockCatalog](https://github.com/AxolotlBucketLabs/BedrockCatalog).
 
-          The snapshot contains $CATALOG_ENTRIES entries from source revision $CATALOG_SOURCE_SHA. Please review the generated data before merging.
+          The snapshot contains $CATALOG_ENTRIES entries from [BedrockCatalog commit `$CATALOG_SOURCE_SHA`](https://github.com/AxolotlBucketLabs/BedrockCatalog/commit/$CATALOG_SOURCE_SHA). Please review the generated data before merging.
           EOF
 
           if [ -n "$CATALOG_PR_NUMBER" ]; then

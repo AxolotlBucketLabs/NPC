@@ -7,10 +7,12 @@ namespace AxolotlBucketLabs\NPC\model;
 use JsonException;
 use function count;
 use function json_decode;
+use function parse_url;
 use function preg_match;
 use function preg_replace;
 use function preg_split;
 use function str_contains;
+use function str_ends_with;
 use function strtolower;
 use function trim;
 
@@ -34,6 +36,9 @@ final class EmoteCatalog{
 	/** @var array<string, string> */
 	private static array $displayNames = [];
 
+	/** @var array<string, string> */
+	private static array $imageUrlsByUuid = [];
+
 	/** @var list<array{title: string, uuid: string}> */
 	private static array $entries = [];
 
@@ -41,7 +46,7 @@ final class EmoteCatalog{
 	}
 
 	/**
-	 * Loads the generated title-to-UUID catalog bundled in resources/emotes.jsonl.
+	 * Loads the generated title, UUID, and thumbnail catalog bundled in resources/emotes.jsonl.
 	 * The catalog keeps duplicate Marketplace titles addressable by UUID. Name
 	 * lookup uses the first matching title.
 	 */
@@ -66,6 +71,10 @@ final class EmoteCatalog{
 				continue;
 			}
 			self::$entries[] = ["title" => $entry["title"], "uuid" => $uuid];
+			$imageUrl = $entry["imageUrl"] ?? null;
+			if(is_string($imageUrl) && self::isCatalogImageUrl($imageUrl)){
+				self::$imageUrlsByUuid[$uuid] = $imageUrl;
+			}
 			if(!isset(self::$catalog[$alias])){
 				self::$catalog[$alias] = $uuid;
 				self::$displayNames[$alias] = $entry["title"];
@@ -80,15 +89,14 @@ final class EmoteCatalog{
 	}
 
 	/**
-	 * Returns the official thumbnail URL for a catalog entry.
+	 * Returns the thumbnail URL recorded by BedrockCatalog for a catalog entry.
 	 *
-	 * The upstream catalog stores one 128x128 PNG per UUID. The form uses a URL
-	 * icon, so the images remain outside the plugin PHAR and are fetched by the
-	 * Bedrock client only when a player opens an emote menu.
+	 * The form uses a URL icon, so thumbnails remain outside the plugin PHAR and
+	 * are fetched by the Bedrock client only when a player opens an emote menu.
 	 */
 	public static function imageUrl(string $value) : ?string{
 		$uuid = self::resolve($value);
-		return $uuid === null ? null : "https://raw.githubusercontent.com/TwistedAsylumMC/Bedrock-Emotes/main/images/" . $uuid . ".png";
+		return $uuid === null ? null : (self::$imageUrlsByUuid[$uuid] ?? null);
 	}
 
 	/** @return list<array{title: string, uuid: string}> */
@@ -159,5 +167,11 @@ final class EmoteCatalog{
 		// RFC 4122 version/variant bits (the Marketplace catalog contains IDs
 		// such as f8721633-b6e8-b55c-fe38-984f52d756bc).
 		return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $value) === 1;
+	}
+
+	private static function isCatalogImageUrl(string $value) : bool{
+		$urlParts = parse_url($value);
+		$host = is_array($urlParts) ? strtolower($urlParts["host"] ?? "") : "";
+		return is_array($urlParts) && strtolower($urlParts["scheme"] ?? "") === "https" && (str_ends_with($host, ".xboxlive.com") || str_ends_with($host, ".catalog.playfab.com"));
 	}
 }

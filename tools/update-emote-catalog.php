@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-const SOURCE_API_URL = "https://api.github.com/repos/TwistedAsylumMC/Bedrock-Emotes/contents/emotes.json";
+const SOURCE_API_URL = "https://api.github.com/repos/AxolotlBucketLabs/BedrockCatalog/commits?path=data%2Fpersona-emotes.json&per_page=1";
+const SOURCE_DATA_URL = "https://raw.githubusercontent.com/AxolotlBucketLabs/BedrockCatalog/";
 const TARGET_PATH = __DIR__ . "/../resources/emotes.jsonl";
 
 $targetPath = TARGET_PATH;
@@ -43,22 +44,22 @@ function fetchJson(string $url, ?string $authorizationToken = null) : string{
 
 try{
 	$authorizationToken = getenv("GH_TOKEN") ?: null;
-	$metadata = json_decode(fetchJson(SOURCE_API_URL, $authorizationToken), true, 512, JSON_THROW_ON_ERROR);
-	if(!is_array($metadata) || !is_string($metadata["sha"] ?? null) || !is_string($metadata["download_url"] ?? null)){
-		throw new RuntimeException("The upstream metadata response is missing its source revision");
+	$commits = json_decode(fetchJson(SOURCE_API_URL, $authorizationToken), true, 512, JSON_THROW_ON_ERROR);
+	if(!is_array($commits) || !array_is_list($commits) || !is_string($commits[0]["sha"] ?? null) || preg_match('/^[0-9a-f]{40}$/D', $commits[0]["sha"]) !== 1){
+		throw new RuntimeException("BedrockCatalog did not return a valid source revision");
 	}
 
-	$sourceSha = $metadata["sha"];
-	$source = json_decode(fetchJson($metadata["download_url"]), true, 512, JSON_THROW_ON_ERROR);
-	if(!is_array($source) || !array_is_list($source)){
-		throw new RuntimeException("The upstream emote catalog is not a list");
+	$sourceSha = $commits[0]["sha"];
+	$source = json_decode(fetchJson(SOURCE_DATA_URL . $sourceSha . "/data/persona-emotes.json"), true, 512, JSON_THROW_ON_ERROR);
+	if(!is_array($source) || ($source["schemaVersion"] ?? null) !== 1 || ($source["dataset"] ?? null) !== "persona_emotes" || !is_array($source["items"] ?? null) || !array_is_list($source["items"])){
+		throw new RuntimeException("BedrockCatalog returned an unsupported persona-emote export");
 	}
 
 	$entries = [];
 	$uuids = [];
-	foreach($source as $index => $entry){
-		if(!is_array($entry) || !is_string($entry["title"] ?? null) || !is_string($entry["uuid"] ?? null)){
-			throw new RuntimeException("The upstream entry at index {$index} is missing title or UUID");
+	foreach($source["items"] as $index => $entry){
+		if(!is_array($entry) || ($entry["dataset"] ?? null) !== "persona_emote" || ($entry["pieceType"] ?? null) !== "persona_emote" || ($entry["contentType"] ?? null) !== "PersonaDurable" || !is_string($entry["title"] ?? null) || !is_string($entry["uuid"] ?? null)){
+			throw new RuntimeException("BedrockCatalog entry at index {$index} is not a confirmed persona emote with a title and UUID");
 		}
 		$title = trim($entry["title"]);
 		$uuid = strtolower(trim($entry["uuid"]));
@@ -72,11 +73,35 @@ try{
 			throw new RuntimeException("The upstream catalog contains the duplicate UUID {$uuid}");
 		}
 		$uuids[$uuid] = true;
-		$entries[] = ["title" => $title, "uuid" => $uuid];
+
+		$thumbnailUrl = null;
+		$images = $entry["images"] ?? null;
+		if(!is_array($images) || !array_is_list($images)){
+			throw new RuntimeException("BedrockCatalog entry at index {$index} has an invalid image list");
+		}
+		foreach($images as $image){
+			if(!is_array($image)){
+				throw new RuntimeException("BedrockCatalog image at index {$index} is invalid");
+			}
+			if(($image["Tag"] ?? null) !== "Thumbnail"){
+				continue;
+			}
+			if(!is_string($image["Url"] ?? null)){
+				throw new RuntimeException("BedrockCatalog thumbnail at index {$index} has no URL");
+			}
+			$thumbnailUrl = $image["Url"];
+			$urlParts = parse_url($thumbnailUrl);
+			$host = is_array($urlParts) ? strtolower($urlParts["host"] ?? "") : "";
+			if(!is_array($urlParts) || strtolower($urlParts["scheme"] ?? "") !== "https" || (!str_ends_with($host, ".xboxlive.com") && !str_ends_with($host, ".catalog.playfab.com"))){
+				throw new RuntimeException("BedrockCatalog thumbnail at index {$index} has an unsupported URL");
+			}
+			break;
+		}
+		$entries[] = ["title" => $title, "uuid" => $uuid, "imageUrl" => $thumbnailUrl];
 	}
 
-	if($entries === []){
-		throw new RuntimeException("The upstream emote catalog is empty");
+	if($entries === [] || ($source["count"] ?? null) !== count($entries)){
+		throw new RuntimeException("BedrockCatalog emote count does not match its exported entries");
 	}
 
 	$lines = [];
@@ -97,7 +122,7 @@ try{
 	echo "entries=" . count($entries) . "\n";
 	echo "changed=" . ($changed ? "true" : "false") . "\n";
 }catch(JsonException $exception){
-	fwrite(STDERR, "Could not decode the upstream emote catalog: " . $exception->getMessage() . "\n");
+	fwrite(STDERR, "Could not decode the BedrockCatalog export: " . $exception->getMessage() . "\n");
 	exit(1);
 }catch(Throwable $exception){
 	fwrite(STDERR, $exception->getMessage() . "\n");

@@ -14,6 +14,7 @@ All notable changes to NPC are documented here.
 
 ### Changed
 
+- Source the bundled player-emote titles, UUIDs, and thumbnails from AxolotlBucketLabs/BedrockCatalog.
 - Move the maintained plugin namespace and project identity to `AxolotlBucketLabs`.
 - Use AxolotlBucketLabs DevTools `v3.3.0` for CI and release packaging.
 - Resolve PMForms `2.3.1` from the AxolotlBucketLabs repository.

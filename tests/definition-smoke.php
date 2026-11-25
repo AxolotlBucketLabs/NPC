@@ -97,7 +97,7 @@ $emoteCatalog = file_get_contents(dirname(__DIR__) . '/resources/emotes.jsonl');
 if($emoteCatalog === false || EmoteCatalog::load($emoteCatalog) < 1000 || EmoteCatalog::resolve("4th dimension") !== "5f2c9473-ff88-ed4f-674b-9943dd6c81f2" || EmoteCatalog::resolve("tp random") !== "f8721633-b6e8-b55c-fe38-984f52d756bc"){
 	throw new RuntimeException("Bundled Marketplace emote catalog failed");
 }
-if(EmoteCatalog::imageUrl("e115b8af-b508-06c0-c4a9-fe540bf2fd5b") !== "https://raw.githubusercontent.com/TwistedAsylumMC/Bedrock-Emotes/main/images/e115b8af-b508-06c0-c4a9-fe540bf2fd5b.png"){
+if(EmoteCatalog::imageUrl("e115b8af-b508-06c0-c4a9-fe540bf2fd5b") !== "https://xforgeassets002.xboxlive.com/pf-namespace-b63a0803d3653643/8e25a361-0f99-4b0b-ba29-8c0e346a55d6/em_tntgames_airgtnt_thumbnail_0.png"){
 	throw new RuntimeException("Emote thumbnail URL generation failed");
 }
 $airGuitarVariants = EmoteCatalog::search("air guitar", 2, 1);

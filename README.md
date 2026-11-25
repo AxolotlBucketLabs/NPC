@@ -162,7 +162,7 @@ The UI provides an option to copy all or selected equipment slots from the execu
 
 Animation triggers are `timer`, `spawn`, `right_click`, and `left_click`.
 
-Player emotes are separate from actor animations. The bundled catalog is loaded from `resources/emotes.jsonl`. It contains the current checked-in title and UUID snapshot. The built-in aliases include `wave`, `simple_clap`, `over_there`, `over_here`, `bow`, `saluting`, and `thinking`. A valid Bedrock emote UUID can also be entered directly.
+Player emotes are separate from actor animations. The bundled title, UUID, and thumbnail snapshot in `resources/emotes.jsonl` is sourced from [BedrockCatalog](https://github.com/AxolotlBucketLabs/BedrockCatalog). Its Marketplace metadata and linked thumbnails are excluded from NPC's MIT license and remain subject to their respective rights and terms. The built-in aliases include `wave`, `simple_clap`, `over_there`, `over_here`, `bow`, `saluting`, and `thinking`. A valid Bedrock emote UUID can also be entered directly.
 
 The current catalog includes visual variants for entities such as Armadillo, Axolotl, Cat, Fox, Frog, Llama, Mooshroom, Panda, Parrot, Rabbit, Sheep, Shulker, Wolf, and Tropical Fish. Run `/npc entities` for entity types and use the UI editor for the variant options available to the selected type.
 
@@ -401,4 +401,4 @@ NPC was created by NhanAZ and is maintained by AxolotlBucketLabs.
 
 ## License
 
-NPC is released under the MIT License. Axolotl-PM, PMForms, BedrockQuery, ScoreHud, and other optional integrations remain licensed by their respective projects.
+NPC's original code is released under the MIT License. The bundled Marketplace metadata and thumbnails from BedrockCatalog are excluded. Axolotl-PM, PMForms, BedrockQuery, ScoreHud, and other optional integrations remain licensed by their respective projects.
